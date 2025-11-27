@@ -307,24 +307,35 @@
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-        // 【重要警告】如果要在外部部署 (如 GitHub Pages)，請將下面的 LOCAL_FIREBASE_CONFIG 替換為您自己的 Firebase 專案設定！
-        // 否則 Firebase 無法連線，將會導致圖表無法載入資料，以及任務列表點擊失效。
-const firebaseConfig = {
-  apiKey: "AIzaSyAXnSDK_kY4Aa8XvL0M_Md9kA4Wdow_Uvs",
-  authDomain: "daily-23c82.firebaseapp.com",
-  projectId: "daily-23c82",
-  storageBucket: "daily-23c82.firebasestorage.app",
-  messagingSenderId: "574719251457",
-  appId: "1:574719251457:web:30aadb364406783b175c00",
-  measurementId: "G-6JN0N6BJHH"
+// 確保您在整個檔案中只使用一次 'const firebaseConfig'
+
+// 1. 定義外部或本地的 Firebase 配置（使用一個新的變數名，例如 LOCAL_FIREBASE_CONFIG）
+// 【重要警告】如果要在外部部署 (如 GitHub Pages)，請將下面的配置替換為您自己的 Firebase 專案設定！
+const LOCAL_FIREBASE_CONFIG = {
+    apiKey: "AIzaSyAXnSDK_kY4Aa8XvL0M_Md9kA4Wdow_Uvs",
+    authDomain: "daily-23c82.firebaseapp.com",
+    projectId: "daily-23c82",
+    storageBucket: "daily-23c82.firebasestorage.app",
+    messagingSenderId: "574719251457",
+    appId: "1:574719251457:web:30aadb364406783b175c00",
+    measurementId: "G-6JN0N6BJHH"
 };
 
 
-        const firebaseConfig = 
-            (typeof __firebase_config !== 'undefined' && __firebase_config !== 'null' && __firebase_config.length > 2) 
-                ? JSON.parse(__firebase_config) 
-                : LOCAL_FIREBASE_CONFIG; 
+// 2. 宣告並賦值給最終的 firebaseConfig 變數（這是唯一使用 const firebaseConfig 的地方）
+// 檢查 Canvas 環境變數是否存在，如果不存在，則使用 LOCAL_FIREBASE_CONFIG。
 
+// 獲取 Canvas 專案 ID 和 Auth Token
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+const firebaseConfig = 
+    (typeof __firebase_config !== 'undefined' && __firebase_config !== 'null' && __firebase_config.length > 2) 
+        ? JSON.parse(__firebase_config) 
+        : LOCAL_FIREBASE_CONFIG; 
+
+// 現在您可以安全地使用 firebaseConfig 來初始化 Firebase 了
+// const app = initializeApp(firebaseConfig);
         let app, db, auth, userId = null, isAuthReady = false;
         let routineTasks = []; // Example: [{ name: "Task A", category: "ERP", notes: "" }]
         let completedRoutineTaskNames = new Set(); 
