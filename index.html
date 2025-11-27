@@ -121,6 +121,10 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     <span>歷史紀錄</span>
                 </button>
+                 <button onclick="showUserSettingsModal()" class="flex items-center space-x-2 bg-cyan-600 hover:bg-cyan-500 text-white font-medium py-2 px-4 rounded-lg shadow-lg transition duration-150 text-sm">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                    <span>帳號切換</span>
+                </button>
             </div>
         </header>
         
@@ -241,9 +245,50 @@
         
         <!-- Footer Info -->
         <div class="mt-8 text-center text-xs text-gray-600 no-print">
-            <p>App ID: <span id="app-id-display" class="font-mono"></span> | User ID: <span id="user-id-display" class="font-mono"></span></p>
+            <p>App ID: <span id="app-id-display" class="font-mono"></span> | Data Source: <span id="user-id-display" class="font-mono text-cyan-500"></span></p>
         </div>
 
+    </div>
+
+    <!-- 用戶設定與切換模態視窗 -->
+    <div id="user-settings-modal" class="modal-overlay hidden" style="z-index: 250;">
+        <div class="modal-content p-6 rounded-xl shadow-2xl w-full max-w-md">
+            <div class="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
+                <h3 class="text-xl font-bold text-cyan-400 flex items-center">
+                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                    用戶帳號設定 (跨裝置同步)
+                </h3>
+                <button onclick="closeUserSettingsModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            
+            <div class="space-y-6">
+                <div class="bg-slate-800 p-4 rounded-lg border border-slate-600">
+                    <label class="block text-xs text-gray-500 mb-1 uppercase tracking-wider">當前資料儲存 ID</label>
+                    <div class="flex items-center justify-between">
+                        <span id="modal-current-user-id" class="font-mono text-lg text-green-400 break-all font-bold">--</span>
+                        <span class="text-xs px-2 py-1 rounded bg-slate-700 text-gray-300 ml-2 whitespace-nowrap">使用中</span>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">注意：匿名登入的 ID 隨機產生，更換電腦會消失。若要跨電腦使用，請設定下方「自訂 ID」。</p>
+                </div>
+
+                <div class="bg-indigo-900/30 p-4 rounded-lg border border-indigo-500/50">
+                    <label class="block text-sm font-bold text-indigo-300 mb-2">設定自訂 ID (推薦)</label>
+                    <p class="text-xs text-gray-400 mb-3">設定一個容易記住的名稱 (如: `alex-work`)，在其他電腦輸入相同名稱即可同步資料。</p>
+                    <div class="flex space-x-2">
+                        <input type="text" id="custom-user-id-input" placeholder="輸入您的自訂 ID" class="flex-1 bg-slate-900 border border-indigo-500 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5">
+                        <button onclick="applyCustomUserId()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors">
+                            切換/載入
+                        </button>
+                    </div>
+                </div>
+
+                <div class="text-center pt-2">
+                     <button onclick="resetToSystemId()" class="text-xs text-red-400 hover:text-red-300 underline">
+                        重置為系統預設 ID (不推薦)
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- 歷史紀錄模態視窗 -->
@@ -303,7 +348,7 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot, collection, query, where, addDoc, getDocs, setLogLevel, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firebase 偵錯日誌：如果持續無法寫入，請取消下方註釋以查看詳細錯誤 (如權限錯誤)
+        // Firebase 偵錯日誌
         // setLogLevel('Debug');
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
@@ -320,28 +365,35 @@
             measurementId: "G-6JN0N6BJHH"
         };
 
-        // Firebase 配置：優先使用 Canvas 提供的，否則使用本機備用配置
+        // Firebase 配置
         let firebaseConfig = 
             (typeof __firebase_config !== 'undefined' && __firebase_config !== 'null' && __firebase_config.length > 2) 
                 ? JSON.parse(__firebase_config) 
                 : LOCAL_FIREBASE_CONFIG; 
 
-        let app, db, auth, userId = null, isAuthReady = false;
-        let routineTasks = []; // Example: [{ name: "Task A", category: "ERP", notes: "" }]
+        let app, db, auth;
+        // userId: Firebase Authentication 的真實 UID (用於驗證)
+        let authUserId = null; 
+        // dataUserId: 實際用來存取資料的 ID (可能是 authUserId 或 用戶自訂的 ID)
+        let dataUserId = null;
+        let isAuthReady = false;
+
+        let routineTasks = []; 
         let completedRoutineTaskNames = new Set(); 
         let dailyLogs = [];
         let statsChart = null;
         
-        // 用於追蹤哪些任務類別是展開的
+        // 監聽器取消函數 (用於切換用戶時取消舊的監聽)
+        let unsubscribeRoutine = null;
+        let unsubscribeLogs = null;
+        
         let openCategories = new Set(); 
         
-        // 設定 Chart.js 預設字體和顏色
-        Chart.defaults.color = '#e2e8f0'; // Gray 200
-        Chart.defaults.font.family = 'Microsoft YaHei, Microsoft JhengHei, Inter, sans-serif'; // 更新 Chart.js 字體
+        Chart.defaults.color = '#e2e8f0'; 
+        Chart.defaults.font.family = 'Microsoft YaHei, Microsoft JhengHei, Inter, sans-serif'; 
 
         // --- Chart.js Initialization ---
         const initChart = () => {
-            // 如果圖表已經存在，先銷毀它以避免重複渲染問題
             if (statsChart) {
                 statsChart.destroy();
             }
@@ -352,8 +404,7 @@
                 data: {
                     labels: ['例行工作 (Routine)', '臨時狀況 (Ad-hoc)'],
                     datasets: [{
-                        data: [0, 0], // Initial data
-                        // FIX: 統一顏色，Routine: 藍色 (#60a5fa), Ad-hoc: 紅色 (#f87171)
+                        data: [0, 0], 
                         backgroundColor: ['#60a5fa', '#f87171'], 
                         borderWidth: 0,
                         hoverOffset: 4
@@ -367,11 +418,11 @@
                             position: 'right', 
                             labels: { 
                                 usePointStyle: true,
-                                color: '#94a3b8' // Slate 400 for legend text
+                                color: '#94a3b8' 
                             } 
                         },
                         tooltip: {
-                            backgroundColor: 'rgba(30, 41, 59, 0.9)', // Slate 800
+                            backgroundColor: 'rgba(30, 41, 59, 0.9)', 
                             titleColor: '#e2e8f0',
                             bodyColor: '#e2e8f0',
                         }
@@ -379,7 +430,6 @@
                     cutout: '70%',
                 }
             });
-            // 嘗試在初始化後立即更新一次圖表，以防在 onSnapshot 之前已有資料
             updateChart(); 
         };
 
@@ -394,17 +444,13 @@
                 else adhocCount++;
             });
 
-            // 更新圖表數據
             statsChart.data.datasets[0].data = [routineCount, adhocCount];
             statsChart.update();
 
-            // 更新數字統計
             document.getElementById('stat-routine').textContent = routineCount;
-            // FIX: 更新 Ad-hoc 統計數字的顏色，已在 HTML 中修改為 text-red-400
             document.getElementById('stat-adhoc').textContent = adhocCount;
             document.getElementById('log-count-badge').textContent = `${dailyLogs.length} ENTRIES`;
 
-            // 處理無資料顯示
             const placeholder = document.getElementById('chart-placeholder');
             if (routineCount === 0 && adhocCount === 0) {
                 placeholder.classList.remove('hidden');
@@ -441,17 +487,15 @@
             }
             iconEl.innerHTML = `<svg class="w-12 h-12 ${iconColor} mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${iconPath}"></path></svg>`;
 
-
-            // Buttons
             if (onConfirm) {
                 const confirmBtn = document.createElement('button');
                 confirmBtn.className = "bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 font-medium";
-                confirmBtn.textContent = "確認 (Confirm)";
+                confirmBtn.textContent = "確認";
                 confirmBtn.onclick = () => { window.closeMessageModal(); onConfirm(); };
                 
                 const cancelBtn = document.createElement('button');
                 cancelBtn.className = "bg-slate-700 text-gray-200 px-4 py-2 rounded-lg hover:bg-slate-600 font-medium";
-                cancelBtn.textContent = "取消 (Cancel)";
+                cancelBtn.textContent = "取消";
                 cancelBtn.onclick = window.closeMessageModal;
 
                 actionsEl.appendChild(cancelBtn);
@@ -467,30 +511,17 @@
             modal.classList.remove('hidden');
         };
 
-        /**
-         * 展開或收合任務類別的內容。
-         * @param {HTMLElement} button 點擊的按鈕
-         * @param {string} category 類別名稱
-         * @param {string} contentId 內容容器的 ID
-         * @param {string} iconId 旋轉圖標的 ID
-         */
         window.toggleAccordion = (button, category, contentId, iconId) => {
-            // 直接通過 ID 獲取元素，這是最可靠的方式
             const content = document.getElementById(contentId);
             const icon = document.getElementById(iconId);
             
-            if (!content || !icon) {
-                console.error("Accordion Error: Content or icon element not found for category:", category, { contentId, iconId });
-                return;
-            }
+            if (!content || !icon) return;
 
             if (content.classList.contains('hidden')) {
-                // Open
                 content.classList.remove('hidden');
                 icon.classList.add('rotate-180');
                 openCategories.add(category);
             } else {
-                // Close
                 content.classList.add('hidden');
                 icon.classList.remove('rotate-180');
                 openCategories.delete(category);
@@ -510,9 +541,54 @@
             return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
         };
 
-        // Firestore 路徑定義
-        const getRoutineTasksDocRef = () => userId ? doc(db, 'artifacts', appId, 'users', userId, 'config', 'routine_tasks') : null;
-        const getDailyLogCollectionRef = (dateString = getTodayDateString()) => userId ? collection(db, 'artifacts', appId, 'users', userId, 'daily_logs', dateString, 'entries') : null;
+        // Firestore 路徑定義 - 關鍵修改：使用 dataUserId 而非 authUserId
+        const getRoutineTasksDocRef = () => dataUserId ? doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'routine_tasks') : null;
+        const getDailyLogCollectionRef = (dateString = getTodayDateString()) => dataUserId ? collection(db, 'artifacts', appId, 'users', dataUserId, 'daily_logs', dateString, 'entries') : null;
+
+        // --- User ID Management ---
+        const determineDataUserId = (authenticatedUid) => {
+            // 檢查 LocalStorage 是否有使用者自訂的 ID
+            const storedCustomId = localStorage.getItem('custom_user_id');
+            if (storedCustomId) {
+                return storedCustomId;
+            }
+            return authenticatedUid;
+        };
+
+        window.showUserSettingsModal = () => {
+            document.getElementById('modal-current-user-id').textContent = dataUserId || '尚未連線';
+            document.getElementById('custom-user-id-input').value = localStorage.getItem('custom_user_id') || '';
+            document.getElementById('user-settings-modal').classList.remove('hidden');
+        };
+
+        window.closeUserSettingsModal = () => {
+            document.getElementById('user-settings-modal').classList.add('hidden');
+        };
+
+        window.applyCustomUserId = () => {
+            const input = document.getElementById('custom-user-id-input').value.trim();
+            if (!input) {
+                showMessage('error', '錯誤', 'ID 不能為空');
+                return;
+            }
+            // 簡單的格式驗證
+            if (/[^a-zA-Z0-9\-_]/.test(input)) {
+                showMessage('error', '格式錯誤', 'ID 只能包含英文字母、數字、減號(-)與底線(_)');
+                return;
+            }
+
+            showMessage('confirm', '切換帳號', `確定要切換到 ID: ${input} 嗎？`, () => {
+                localStorage.setItem('custom_user_id', input);
+                window.location.reload(); // 重新整理最乾脆，確保所有狀態重置
+            });
+        };
+
+        window.resetToSystemId = () => {
+             showMessage('warning', '重置確認', `確定要移除自訂 ID 並恢復為系統預設值嗎？您可能會看不到目前的資料。`, () => {
+                localStorage.removeItem('custom_user_id');
+                window.location.reload();
+            });
+        };
 
         // --- Firebase Core ---
         const initFirebase = async () => {
@@ -531,20 +607,27 @@
                 auth = getAuth(app);
                 await setPersistence(auth, browserSessionPersistence);
 
-                // 嘗試使用提供的 auth token 登入，否則匿名登入
                 if (initialAuthToken) await signInWithCustomToken(auth, initialAuthToken);
                 else await signInAnonymously(auth);
 
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
-                        userId = user.uid;
+                        authUserId = user.uid; // 這是 Firebase 認證的 UID
                         isAuthReady = true;
-                        document.getElementById('user-id-display').textContent = userId;
-                        
-                        // FIX: 在顯示容器和日誌訂閱後立即初始化圖表
-                        initChart(); 
 
-                        // 驗證成功後才開始載入和訂閱資料
+                        // 決定要讀取資料的 ID (自訂 ID 優先)
+                        dataUserId = determineDataUserId(authUserId);
+                        
+                        // 顯示目前使用的 Data Source ID
+                        const displayEl = document.getElementById('user-id-display');
+                        displayEl.textContent = dataUserId;
+                        // 如果是自訂 ID，加個標記
+                        if (dataUserId !== authUserId) {
+                             displayEl.textContent += " (Custom)";
+                             displayEl.classList.add("text-yellow-400");
+                        }
+                        
+                        initChart(); 
                         loadRoutineTasks();
                         subscribeToDailyLogs();
                         
@@ -554,8 +637,14 @@
                             document.getElementById('loading-overlay').style.display = 'none';
                             document.getElementById('app-container').style.display = 'block';
                         }, 300);
+                        
+                        // 如果是第一次匿名登入且沒有設定自訂 ID，提示用戶
+                        if (dataUserId === authUserId && !localStorage.getItem('seen_user_tip')) {
+                             // 這裡可以選擇性彈出提示，暫時不彈以免干擾
+                             localStorage.setItem('seen_user_tip', 'true');
+                        }
+
                     } else {
-                        // 處理登出或登入失敗
                         document.getElementById('loading-overlay').innerHTML = `<p class="text-red-400">登入失敗，無法載入資料</p>`;
                     }
                 });
@@ -567,8 +656,11 @@
 
         // --- Logic: Routine Tasks (with Category Grouping) ---
         const loadRoutineTasks = () => {
-            if (!isAuthReady) return;
-            onSnapshot(getRoutineTasksDocRef(), (docSnap) => {
+            if (!isAuthReady || !dataUserId) return;
+            
+            if (unsubscribeRoutine) unsubscribeRoutine(); // 取消舊的監聽
+
+            unsubscribeRoutine = onSnapshot(getRoutineTasksDocRef(), (docSnap) => {
                 if (docSnap.exists() && Array.isArray(docSnap.data().tasks)) {
                     routineTasks = docSnap.data().tasks.map(task => ({
                         // Ensure required fields exist
@@ -582,13 +674,16 @@
                 renderRoutineTasks(); 
             }, (error) => {
                 console.error("Error loading routine tasks:", error);
-                showMessage('error', '載入失敗', '無法載入例行任務清單。請檢查網路或 Firestore 權限。');
+                // 權限錯誤通常是因為自訂 ID 設定錯誤或 Firebase 規則限制
+                if (error.code === 'permission-denied') {
+                     showMessage('error', '權限錯誤', '無法讀取資料。請確認您使用的自訂 ID 正確，或嘗試重置 ID。');
+                }
             });
         };
 
         const saveRoutineTasks = async (tasks) => {
-            if (!isAuthReady || !userId) {
-                 showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
+            if (!isAuthReady || !dataUserId) {
+                 showMessage('error', '驗證錯誤', '尚未連線，請稍候再試。');
                  return;
             }
             try {
@@ -604,7 +699,7 @@
             const name = document.getElementById('new-routine-task-name').value.trim();
             const notes = document.getElementById('new-routine-task-notes').value.trim();
             
-            if (!isAuthReady || !userId) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
+            if (!isAuthReady || !dataUserId) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
             if (!name) return showMessage('error', '錯誤', '任務名稱不可為空');
             
             if (routineTasks.some(t => t.name === name)) return showMessage('error', '重複', '任務名稱已存在');
@@ -615,21 +710,18 @@
             document.getElementById('new-routine-task-notes').value = '';
         };
 
-        // Deletes by unique name, not by index, to handle sorting/grouping changes
         window.deleteRoutineTaskByName = (taskName) => {
-            if (!isAuthReady || !userId) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
+            if (!isAuthReady || !dataUserId) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
             const taskIndex = routineTasks.findIndex(t => t.name === taskName);
             if (taskIndex === -1) return;
             const task = routineTasks[taskIndex];
             
             showMessage('confirm', '刪除確認', `確定要永久刪除例行任務「${task.name}」嗎？這將同時刪除今日相關日誌。`, async () => {
                 try {
-                    // Cascade delete logs (only for today for simplicity)
                     const logsToDelete = dailyLogs.filter(l => l.type === 'Routine' && l.taskName === task.name);
                     for (const log of logsToDelete) {
                         await deleteDoc(doc(getDailyLogCollectionRef(), log.id));
                     }
-                    // Update list
                     const newTasks = routineTasks.filter(t => t.name !== task.name);
                     await saveRoutineTasks(newTasks);
                 } catch (e) {
@@ -663,7 +755,7 @@
         };
 
         window.importRoutineTasks = () => {
-            if (!isAuthReady || !userId) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
+            if (!isAuthReady || !dataUserId) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
             const fileInput = document.createElement('input');
             fileInput.type = 'file';
             fileInput.accept = 'application/json';
@@ -716,9 +808,11 @@
 
         // --- Logic: Logs ---
         const subscribeToDailyLogs = () => {
-            if (!isAuthReady) return;
-            // 訂閱今日日誌
-            onSnapshot(getDailyLogCollectionRef(), (snapshot) => {
+            if (!isAuthReady || !dataUserId) return;
+            
+            if (unsubscribeLogs) unsubscribeLogs(); // 取消舊的監聽
+
+            unsubscribeLogs = onSnapshot(getDailyLogCollectionRef(), (snapshot) => {
                 dailyLogs = [];
                 completedRoutineTaskNames.clear();
                 
@@ -730,33 +824,28 @@
                     }
                 });
                 
-                dailyLogs.sort((a, b) => b.timestamp - a.timestamp); // Sort Newest First for Timeline
+                dailyLogs.sort((a, b) => b.timestamp - a.timestamp); 
                 
-                // 呼叫更新，確保圖表和列表狀態同步
                 renderTimeline(dailyLogs, document.getElementById('daily-log-timeline'));
-                renderRoutineTasks(); // Update checkbox states and redraw list
-                updateChart(); // Update dashboard
+                renderRoutineTasks(); 
+                updateChart(); 
             }, (error) => {
                 console.error("Error subscribing to daily logs:", error);
-                showMessage('error', '即時錯誤', '無法訂閱今日日誌。請檢查網路或 Firestore 權限。');
             });
         };
 
         window.addLogEntry = async (type, description, taskName = null, category = '一般') => {
             if (!description) return false;
-            // 修正重點：確保在寫入前已通過驗證
-            if (!isAuthReady || !userId) {
+            if (!isAuthReady || !dataUserId) {
                  showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，無法寫入日誌。');
                  return false;
             }
             try {
-                // *** 寫入日誌到 Firestore ***
                 await addDoc(getDailyLogCollectionRef(), {
                     type, description, taskName, category,
                     timestamp: Date.now(),
                     timeString: new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
                 });
-                // 成功寫入後，onSnapshot 會自動更新 UI (subscribeToDailyLogs 處理)
                 return true;
             } catch (e) {
                 console.error("Log Entry Write Error:", e);
@@ -777,13 +866,12 @@
         };
 
         window.deleteDailyLog = (id, dateStr) => {
-            // 檢查日誌刪除權限
-            if (!isAuthReady || !userId) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
+            if (!isAuthReady || !dataUserId) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
             
             showMessage('confirm', '刪除日誌', '確定要刪除這筆紀錄嗎？若是例行任務將會變回未完成狀態。', async () => {
                 try {
                     await deleteDoc(doc(getDailyLogCollectionRef(dateStr), id));
-                    if (dateStr !== getTodayDateString()) fetchLogsForDate(dateStr); // Refresh history if needed
+                    if (dateStr !== getTodayDateString()) fetchLogsForDate(dateStr); 
                 } catch (e) {
                     console.error("Delete Log Error:", e);
                     showMessage('error', '刪除失敗', `無法刪除日誌。錯誤: ${e.message}`);
@@ -791,7 +879,7 @@
             });
         };
 
-        // --- UI Rendering: Routine Tasks (Grouped by Category) ---
+        // --- UI Rendering ---
         const renderRoutineTasks = () => {
             const list = document.getElementById('routine-tasks-list');
             list.innerHTML = '';
@@ -810,7 +898,7 @@
                 return acc;
             }, {});
 
-            let categoryIndex = 0; // *** FIX FOR ACCORDION: Use index for guaranteed unique ID ***
+            let categoryIndex = 0; 
 
             Object.entries(tasksByCategory).forEach(([category, tasks]) => {
                 const completedTasksCount = tasks.filter(task => completedRoutineTaskNames.has(task.name)).length;
@@ -818,32 +906,24 @@
                 const progressPercent = totalTasksCount > 0 ? Math.round((completedTasksCount / totalTasksCount) * 100) : 0;
                 const isAllDone = completedTasksCount === totalTasksCount;
                 
-                // 恢復展開狀態
                 const isOpened = openCategories.has(category);
                 
-                // 生成絕對唯一 ID
                 const uniqueIdSuffix = `cat-${categoryIndex++}`;
                 const contentId = `content-${uniqueIdSuffix}`;
                 const iconId = `icon-${uniqueIdSuffix}`;
-                // *** END FIX ***
 
-                // 視覺化優化 - 類別進度條 (僅在按鈕上顯示)
                 const headerBaseClass = 'relative z-10 flex items-center justify-between w-full p-3 text-base font-semibold text-left rounded-lg transition-colors duration-150 border overflow-hidden';
                 const headerStyleClass = isAllDone ? 'border-blue-500 hover:border-blue-400' : 'border-slate-700 hover:border-cyan-400';
                 const progressColor = isAllDone ? 'bg-blue-600/70' : 'bg-cyan-600/70';
                 
-                // Accordion header (Category)
                 const categoryHeader = document.createElement('div');
                 categoryHeader.className = "relative mb-2";
 
                 categoryHeader.innerHTML = `
                     <button onclick="toggleAccordion(this, '${category}', '${contentId}', '${iconId}')" class="${headerBaseClass} ${headerStyleClass}">
-                        <!-- 進度條 (Progress Bar) - 放在按鈕內部，作為背景層 -->
                         <div class="absolute inset-0 h-full transition-all duration-300 pointer-events-none" style="width: ${progressPercent}%;">
                             <div class="h-full ${progressColor}"></div>
                         </div>
-
-                        <!-- 內容層 (Content Layer) - 確保文字和按鈕在進度條之上 -->
                         <span class="relative z-20 truncate text-gray-100">${category}</span>
                         <div class="relative z-20 flex items-center space-x-2">
                              <span class="text-sm font-bold ${isAllDone ? 'text-blue-200' : 'text-cyan-200'}">${progressPercent}%</span>
@@ -851,9 +931,7 @@
                              <svg id="${iconId}" class="w-4 h-4 transform transition-transform duration-300 ${isOpened ? 'rotate-180' : 'rotate-0'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                         </div>
                     </button>
-                    <!-- 任務列表內容，使用唯一 ID -->
                     <div id="${contentId}" class="space-y-1 p-3 bg-slate-800 border border-slate-700 rounded-b-lg ${isOpened ? '' : 'hidden'}">
-                        <!-- Task list content -->
                     </div>
                 `;
                 list.appendChild(categoryHeader);
@@ -863,7 +941,6 @@
                 tasks.forEach((task) => {
                     const isDone = completedRoutineTaskNames.has(task.name);
                     
-                    // 視覺化優化 - 任務卡片 (FIX: 統一使用藍色作為 Routine 完成色)
                     const taskEl = document.createElement('div');
                     taskEl.className = `flex items-center justify-between p-3 rounded-lg border-2 transition-all duration-200 ${isDone 
                         ? 'border-blue-700 bg-blue-900/20 opacity-70' 
@@ -887,7 +964,6 @@
                         taskEl.querySelector('input').addEventListener('change', async (e) => {
                              e.target.disabled = true;
                              const success = await window.addLogEntry('Routine', `完成: ${task.name} (${category})`, task.name, category);
-                             // The next renderRoutineTasks() call, triggered by the log change snapshot, will handle the state update and UI refresh.
                              if (!success) { 
                                  e.target.disabled = false; 
                                  e.target.checked = false; 
@@ -899,7 +975,6 @@
             });
         };
 
-        // --- UI Rendering: Timeline ---
         const renderTimeline = (logs, container, isHistory = false, dateStr = getTodayDateString()) => {
             container.innerHTML = '';
             if (logs.length === 0) {
@@ -909,7 +984,6 @@
 
             logs.forEach(log => {
                 const isRoutine = log.type === 'Routine';
-                // FIX: 統一顏色，Routine: 藍色, AdHoc: 紅色
                 const icon = isRoutine 
                     ? `<svg class="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>`
                     : `<svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
@@ -944,15 +1018,11 @@
             });
         };
 
-
-        // --- History Modal Logic ---
         window.showHistoryModal = () => {
             document.getElementById('history-modal').classList.remove('hidden');
-            // 預設選擇今日日期
             const today = getTodayDateString();
-            const datePicker = document.getElementById('history-date-picker');
-            datePicker.value = today;
-            fetchLogsForDate(today); // 載入今日的歷史紀錄
+            document.getElementById('history-date-picker').value = today;
+            fetchLogsForDate(today);
         };
 
         window.closeHistoryModal = () => {
@@ -963,13 +1033,12 @@
             const container = document.getElementById('history-log-entries');
             container.innerHTML = `<p class="text-gray-500 text-center py-10">載入中...</p>`;
 
-            if (!isAuthReady || !userId) {
+            if (!isAuthReady || !dataUserId) {
                  container.innerHTML = `<p class="text-red-400 text-center py-10">驗證失敗，無法查詢歷史紀錄。</p>`;
                  return;
             }
 
             try {
-                // 獲取指定日期的日誌集合
                 const logCollectionRef = getDailyLogCollectionRef(dateStr);
                 const querySnapshot = await getDocs(logCollectionRef);
 
@@ -978,7 +1047,7 @@
                     historyLogs.push({ id: doc.id, ...doc.data() });
                 });
                 
-                historyLogs.sort((a, b) => b.timestamp - a.timestamp); // 排序
+                historyLogs.sort((a, b) => b.timestamp - a.timestamp);
 
                 renderTimeline(historyLogs, container, true, dateStr);
 
@@ -988,24 +1057,19 @@
             }
         };
 
-        // --- Print View Logic ---
         window.togglePrintView = () => {
             const printModal = document.getElementById('print-modal');
             const printContent = document.getElementById('print-content');
             
-            // 複製主日誌區塊的內容到列印視窗
             const logBlock = document.querySelector('.lg\\:col-span-8 > .card:last-child').cloneNode(true);
 
-            // 清理複製的內容中的非列印元素
             [logBlock].forEach(block => {
                 block.querySelectorAll('.no-print').forEach(el => el.remove());
                 block.querySelectorAll('button').forEach(el => el.remove());
             });
 
-            // 移除日誌區塊中的日誌計數標籤
             logBlock.querySelector('#log-count-badge')?.remove();
             
-            // 替換標題，使其適合列印
             const logTitleEl = logBlock.querySelector('h2');
             if (logTitleEl) {
                 logTitleEl.textContent = `日誌時間軸 (${formatDisplayDate(getTodayDateString())})`;
@@ -1015,19 +1079,16 @@
                 <div class="text-center mb-6">
                     <h1 class="text-3xl font-extrabold text-gray-800">工作日誌報告</h1>
                     <p class="text-gray-600 mt-1">日期: ${formatDisplayDate(getTodayDateString())}</p>
-                    <p class="text-gray-600">用戶 ID: ${userId}</p>
+                    <p class="text-gray-600">用戶 ID: ${dataUserId}</p>
                 </div>
             `;
 
             printContent.innerHTML = headerHTML;
             printContent.appendChild(logBlock);
             
-            // 顯示模態視窗
             printModal.classList.remove('hidden');
         };
 
-
-        // --- Init ---
         window.onload = initFirebase;
 
     </script>
