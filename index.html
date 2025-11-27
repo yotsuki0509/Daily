@@ -301,40 +301,29 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot, collection, query, where, addDoc, getDocs, setLogLevel, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // 設定 Firebase Debug 日誌
+        // Firebase 偵錯日誌：如果持續無法寫入，請取消下方註釋以查看詳細錯誤 (如權限錯誤)
         // setLogLevel('Debug');
-// --- 核心 Firebase 配置與環境變數處理 ---
-// 目的：確保在 Canvas 環境內使用全域變數，在外部環境（如 GitHub Pages）使用本地配置。
-// 警告：為避免與用戶主文件中的重複宣告衝突，此處使用 'var' 而非 'const'。
-// 請務必刪除您主文件（daily_log_tracker.html）中任何重複的 'appId' 或 'initialAuthToken' 宣告行。
-// 【重要警告】如果要在外部部署 (如 GitHub Pages)，請將下面的配置替換為您自己的 Firebase 專案設定！
-const LOCAL_FIREBASE_CONFIG = {
-    apiKey: "AIzaSyAXnSDK_kY4Aa8XvL0M_Md9kA4Wdow_Uvs",
-    authDomain: "daily-23c82.firebaseapp.com",
-    projectId: "daily-23c82",
-    storageBucket: "daily-23c82.firebasestorage.app",
-    messagingSenderId: "574719251457",
-    appId: "1:574719251457:web:30aadb364406783b175c00",
-    measurementId: "G-6JN0N6BJHH"
-};
 
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-// 1. 安全地獲取 Canvas 專案 ID 和 Auth Token，如果未定義則使用預設值/null
-// 使用 var 以避免與用戶文件中的舊宣告衝突。
-var appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-var initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        // 本機備用配置
+        let LOCAL_FIREBASE_CONFIG = {
+            apiKey: "AIzaSyAXnSDK_kY4Aa8XvL0M_Md9kA4Wdow_Uvs",
+            authDomain: "daily-23c82.firebaseapp.com",
+            projectId: "daily-23c82",
+            storageBucket: "daily-23c82.firebasestorage.app",
+            messagingSenderId: "574719251457",
+            appId: "1:574719251457:web:30aadb364406783b175c00",
+            measurementId: "G-6JN0N6BJHH"
+        };
 
-// 2. 宣告並賦值給最終的 firebaseConfig 變數
-// 檢查 Canvas 環境變數是否存在且有效，如果不存在，則使用 LOCAL_FIREBASE_CONFIG。
-var firebaseConfig = 
-    (typeof __firebase_config !== 'undefined' && __firebase_config !== 'null' && __firebase_config.length > 2) 
-        ? JSON.parse(__firebase_config) 
-        : LOCAL_FIREBASE_CONFIG; 
+        // Firebase 配置：優先使用 Canvas 提供的，否則使用本機備用配置
+        let firebaseConfig = 
+            (typeof __firebase_config !== 'undefined' && __firebase_config !== 'null' && __firebase_config.length > 2) 
+                ? JSON.parse(__firebase_config) 
+                : LOCAL_FIREBASE_CONFIG; 
 
-// 現在您可以安全地使用 firebaseConfig、appId 和 initialAuthToken 來初始化 Firebase 了
-// 例如：const app = initializeApp(firebaseConfig);
-// 例如：const app = initializeApp(firebaseConfig);
-// const app = initializeApp(firebaseConfig);
         let app, db, auth, userId = null, isAuthReady = false;
         let routineTasks = []; // Example: [{ name: "Task A", category: "ERP", notes: "" }]
         let completedRoutineTaskNames = new Set(); 
@@ -347,16 +336,6 @@ var firebaseConfig =
         // 設定 Chart.js 預設字體和顏色
         Chart.defaults.color = '#e2e8f0'; // Gray 200
         Chart.defaults.font.family = 'Microsoft YaHei, Microsoft JhengHei, Inter, sans-serif'; // 更新 Chart.js 字體
-
-        /**
-         * 將字串淨化為可安全用於 HTML ID 的格式。
-         * @param {string} str 
-         * @returns {string}
-         */
-        const sanitizeId = (str) => {
-            // 將所有非字母數字字元替換為底線，並移除開頭的底線（如果有的話）
-            return str.replace(/[^a-zA-Z0-9]/g, '_').replace(/^_/g, '');
-        }
 
         // --- Chart.js Initialization ---
         const initChart = () => {
@@ -404,6 +383,14 @@ var firebaseConfig =
                 if (log.type === 'Routine') routineCount++;
                 else adhocCount++;
             });
+
+            // *** DEBUG LOGGING FOR ISSUE 1 ***
+            console.log("--- Chart Update Status ---");
+            console.log("Daily Logs Count:", dailyLogs.length);
+            console.log("Routine Log Entries:", routineCount);
+            console.log("AdHoc Log Entries:", adhocCount);
+            console.log("Completed Routine Tasks (Unique):", completedRoutineTaskNames.size);
+            // ---------------------------------
 
             // 更新圖表數據
             statsChart.data.datasets[0].data = [routineCount, adhocCount];
@@ -477,7 +464,6 @@ var firebaseConfig =
             modal.classList.remove('hidden');
         };
 
-        // **Accordion Toggle Logic**
         /**
          * 展開或收合任務類別的內容。
          * @param {HTMLElement} button 點擊的按鈕
@@ -486,6 +472,7 @@ var firebaseConfig =
          * @param {string} iconId 旋轉圖標的 ID
          */
         window.toggleAccordion = (button, category, contentId, iconId) => {
+            // 直接通過 ID 獲取元素，這是最可靠的方式
             const content = document.getElementById(contentId);
             const icon = document.getElementById(iconId);
             
@@ -498,12 +485,12 @@ var firebaseConfig =
                 // Open
                 content.classList.remove('hidden');
                 icon.classList.add('rotate-180');
-                openCategories.add(category); // 紀錄開啟狀態以維持持久性
+                openCategories.add(category);
             } else {
                 // Close
                 content.classList.add('hidden');
                 icon.classList.remove('rotate-180');
-                openCategories.delete(category); // 移除開啟狀態
+                openCategories.delete(category);
             }
         };
 
@@ -520,6 +507,7 @@ var firebaseConfig =
             return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
         };
 
+        // Firestore 路徑定義
         const getRoutineTasksDocRef = () => userId ? doc(db, 'artifacts', appId, 'users', userId, 'config', 'routine_tasks') : null;
         const getDailyLogCollectionRef = (dateString = getTodayDateString()) => userId ? collection(db, 'artifacts', appId, 'users', userId, 'daily_logs', dateString, 'entries') : null;
 
@@ -529,18 +517,8 @@ var firebaseConfig =
             document.getElementById('app-id-display').textContent = appId;
             document.getElementById('history-date-picker').max = getTodayDateString();
 
-            if (!firebaseConfig?.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY_HERE_FOR_EXTERNAL_HOSTING") {
-                document.getElementById('loading-overlay').innerHTML = `
-                    <div class="text-center p-6 bg-red-900/50 rounded-xl border-2 border-red-500 max-w-lg mx-auto">
-                        <p class="text-xl font-bold text-red-400 mb-3">Firebase 初始化失敗 (外部部署)</p>
-                        <p class="text-sm text-gray-300">
-                            錯誤原因：您尚未在程式碼中替換 
-                            <code class="bg-red-800 p-1 rounded font-mono">LOCAL_FIREBASE_CONFIG</code> 
-                            為您**有效的** Firebase 專案設定。<br><br>
-                            圖表和資料存取功能需要此設定才能運作。
-                        </p>
-                    </div>
-                `;
+            if (!firebaseConfig?.apiKey) {
+                document.getElementById('loading-overlay').innerHTML = `<p class="text-red-400 font-bold text-xl">設定錯誤：缺少 Firebase API Key</p>`;
                 return;
             }
 
@@ -550,6 +528,7 @@ var firebaseConfig =
                 auth = getAuth(app);
                 await setPersistence(auth, browserSessionPersistence);
 
+                // 嘗試使用提供的 auth token 登入，否則匿名登入
                 if (initialAuthToken) await signInWithCustomToken(auth, initialAuthToken);
                 else await signInAnonymously(auth);
 
@@ -558,6 +537,7 @@ var firebaseConfig =
                         userId = user.uid;
                         isAuthReady = true;
                         document.getElementById('user-id-display').textContent = userId;
+                        // 驗證成功後才開始載入和訂閱資料
                         loadRoutineTasks();
                         subscribeToDailyLogs();
                         
@@ -568,6 +548,9 @@ var firebaseConfig =
                             document.getElementById('app-container').style.display = 'block';
                             initChart(); // Initialize chart after container is visible
                         }, 300);
+                    } else {
+                        // 處理登出或登入失敗
+                        document.getElementById('loading-overlay').innerHTML = `<p class="text-red-400">登入失敗，無法載入資料</p>`;
                     }
                 });
             } catch (error) {
@@ -591,15 +574,22 @@ var firebaseConfig =
                     routineTasks = [];
                 }
                 renderRoutineTasks(); 
+            }, (error) => {
+                console.error("Error loading routine tasks:", error);
+                showMessage('error', '載入失敗', '無法載入例行任務清單。請檢查網路或 Firestore 權限。');
             });
         };
 
         const saveRoutineTasks = async (tasks) => {
-            if (!isAuthReady) return;
+            if (!isAuthReady || !userId) {
+                 showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
+                 return;
+            }
             try {
                 await setDoc(getRoutineTasksDocRef(), { tasks });
             } catch (e) {
-                showMessage('error', '儲存失敗', '無法更新例行任務清單');
+                console.error("Save Routine Task Error:", e);
+                showMessage('error', '儲存失敗', `無法更新例行任務清單。錯誤: ${e.message}`);
             }
         };
 
@@ -607,6 +597,8 @@ var firebaseConfig =
             const category = document.getElementById('new-routine-task-category').value.trim() || '未分類';
             const name = document.getElementById('new-routine-task-name').value.trim();
             const notes = document.getElementById('new-routine-task-notes').value.trim();
+            
+            if (!isAuthReady || !userId) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
             if (!name) return showMessage('error', '錯誤', '任務名稱不可為空');
             
             if (routineTasks.some(t => t.name === name)) return showMessage('error', '重複', '任務名稱已存在');
@@ -619,20 +611,25 @@ var firebaseConfig =
 
         // Deletes by unique name, not by index, to handle sorting/grouping changes
         window.deleteRoutineTaskByName = (taskName) => {
+            if (!isAuthReady || !userId) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
             const taskIndex = routineTasks.findIndex(t => t.name === taskName);
             if (taskIndex === -1) return;
             const task = routineTasks[taskIndex];
+            
             showMessage('confirm', '刪除確認', `確定要永久刪除例行任務「${task.name}」嗎？這將同時刪除今日相關日誌。`, async () => {
-                // Cascade delete logs
-                const logsToDelete = dailyLogs.filter(l => l.type === 'Routine' && l.taskName === task.name);
-                // Note: The delete operation uses the current day's log collection for simplicity. 
-                // A more complex system would need to check all days.
-                for (const log of logsToDelete) {
-                    await deleteDoc(doc(getDailyLogCollectionRef(), log.id));
+                try {
+                    // Cascade delete logs (only for today for simplicity)
+                    const logsToDelete = dailyLogs.filter(l => l.type === 'Routine' && l.taskName === task.name);
+                    for (const log of logsToDelete) {
+                        await deleteDoc(doc(getDailyLogCollectionRef(), log.id));
+                    }
+                    // Update list
+                    const newTasks = routineTasks.filter(t => t.name !== task.name);
+                    await saveRoutineTasks(newTasks);
+                } catch (e) {
+                    console.error("Delete Routine Task Error:", e);
+                    showMessage('error', '刪除失敗', `無法刪除任務或相關日誌。錯誤: ${e.message}`);
                 }
-                // Update list
-                const newTasks = routineTasks.filter(t => t.name !== task.name);
-                await saveRoutineTasks(newTasks);
             });
         };
         
@@ -660,6 +657,7 @@ var firebaseConfig =
         };
 
         window.importRoutineTasks = () => {
+            if (!isAuthReady || !userId) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
             const fileInput = document.createElement('input');
             fileInput.type = 'file';
             fileInput.accept = 'application/json';
@@ -680,7 +678,6 @@ var firebaseConfig =
                         
                         let uniqueCount = 0;
                         importedData.forEach(task => {
-                            // 確保任務名稱存在
                             if (!task.name || typeof task.name !== 'string' || task.name.trim() === '') {
                                 console.warn("Skipping imported task with invalid name:", task);
                                 return;
@@ -714,6 +711,7 @@ var firebaseConfig =
         // --- Logic: Logs ---
         const subscribeToDailyLogs = () => {
             if (!isAuthReady) return;
+            // 訂閱今日日誌
             onSnapshot(getDailyLogCollectionRef(), (snapshot) => {
                 dailyLogs = [];
                 completedRoutineTaskNames.clear();
@@ -728,23 +726,35 @@ var firebaseConfig =
                 
                 dailyLogs.sort((a, b) => b.timestamp - a.timestamp); // Sort Newest First for Timeline
                 
+                // 呼叫更新，確保圖表和列表狀態同步
                 renderTimeline(dailyLogs, document.getElementById('daily-log-timeline'));
                 renderRoutineTasks(); // Update checkbox states and redraw list
                 updateChart(); // Update dashboard
+            }, (error) => {
+                console.error("Error subscribing to daily logs:", error);
+                showMessage('error', '即時錯誤', '無法訂閱今日日誌。請檢查網路或 Firestore 權限。');
             });
         };
 
         window.addLogEntry = async (type, description, taskName = null, category = '一般') => {
             if (!description) return false;
+            // 修正重點：確保在寫入前已通過驗證
+            if (!isAuthReady || !userId) {
+                 showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，無法寫入日誌。');
+                 return false;
+            }
             try {
+                // *** 寫入日誌到 Firestore ***
                 await addDoc(getDailyLogCollectionRef(), {
                     type, description, taskName, category,
                     timestamp: Date.now(),
                     timeString: new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
                 });
+                // 成功寫入後，onSnapshot 會自動更新 UI (subscribeToDailyLogs 處理)
                 return true;
             } catch (e) {
-                showMessage('error', '寫入失敗', '無法新增日誌');
+                console.error("Log Entry Write Error:", e);
+                showMessage('error', '寫入失敗', `無法新增日誌。錯誤: ${e.message}`);
                 return false;
             }
         };
@@ -761,9 +771,17 @@ var firebaseConfig =
         };
 
         window.deleteDailyLog = (id, dateStr) => {
+            // 檢查日誌刪除權限
+            if (!isAuthReady || !userId) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
+            
             showMessage('confirm', '刪除日誌', '確定要刪除這筆紀錄嗎？若是例行任務將會變回未完成狀態。', async () => {
-                await deleteDoc(doc(getDailyLogCollectionRef(dateStr), id));
-                if (dateStr !== getTodayDateString()) fetchLogsForDate(dateStr); // Refresh history if needed
+                try {
+                    await deleteDoc(doc(getDailyLogCollectionRef(dateStr), id));
+                    if (dateStr !== getTodayDateString()) fetchLogsForDate(dateStr); // Refresh history if needed
+                } catch (e) {
+                    console.error("Delete Log Error:", e);
+                    showMessage('error', '刪除失敗', `無法刪除日誌。錯誤: ${e.message}`);
+                }
             });
         };
 
@@ -786,6 +804,8 @@ var firebaseConfig =
                 return acc;
             }, {});
 
+            let categoryIndex = 0; // *** FIX FOR ACCORDION: Use index for guaranteed unique ID ***
+
             Object.entries(tasksByCategory).forEach(([category, tasks]) => {
                 const completedTasksCount = tasks.filter(task => completedRoutineTaskNames.has(task.name)).length;
                 const totalTasksCount = tasks.length;
@@ -795,10 +815,11 @@ var firebaseConfig =
                 // 恢復展開狀態
                 const isOpened = openCategories.has(category);
                 
-                // 生成唯一且安全的 ID
-                const categoryId = sanitizeId(category);
-                const contentId = `content-${categoryId}`;
-                const iconId = `icon-${categoryId}`;
+                // 生成絕對唯一 ID
+                const uniqueIdSuffix = `cat-${categoryIndex++}`;
+                const contentId = `content-${uniqueIdSuffix}`;
+                const iconId = `icon-${uniqueIdSuffix}`;
+                // *** END FIX ***
 
                 // 視覺化優化 - 類別進度條 (僅在按鈕上顯示)
                 const headerBaseClass = 'relative z-10 flex items-center justify-between w-full p-3 text-base font-semibold text-left rounded-lg transition-colors duration-150 border overflow-hidden';
@@ -809,9 +830,8 @@ var firebaseConfig =
                 const categoryHeader = document.createElement('div');
                 categoryHeader.className = "relative mb-2";
 
-                // 修正後的 onclick，確保類別名稱 (category) 正確傳遞
                 categoryHeader.innerHTML = `
-                    <button onclick="toggleAccordion(this, '${category}', '${contentId}', '${iconId}')" class="${headerBaseClass} ${headerStyleClass} bg-slate-700 hover:bg-slate-600">
+                    <button onclick="toggleAccordion(this, '${category}', '${contentId}', '${iconId}')" class="${headerBaseClass} ${headerStyleClass}">
                         <!-- 進度條 (Progress Bar) - 放在按鈕內部，作為背景層 -->
                         <div class="absolute inset-0 h-full transition-all duration-300 pointer-events-none" style="width: ${progressPercent}%;">
                             <div class="h-full ${progressColor}"></div>
@@ -832,7 +852,7 @@ var firebaseConfig =
                 `;
                 list.appendChild(categoryHeader);
 
-                const taskListContainer = categoryHeader.querySelector(`div#${contentId}`); // 使用 ID 選擇器確保準確性
+                const taskListContainer = categoryHeader.querySelector('div.space-y-1');
 
                 tasks.forEach((task) => {
                     const isDone = completedRoutineTaskNames.has(task.name);
@@ -846,15 +866,15 @@ var firebaseConfig =
                     taskEl.innerHTML = `
                         <div class="flex items-center space-x-3 flex-1 overflow-hidden">
                             <div class="relative flex items-center shrink-0">
-                                <input type="checkbox" id="task-${sanitizeId(task.name)}" data-task-name="${task.name}" class="peer h-6 w-6 cursor-pointer appearance-none rounded-md border-2 border-slate-500 shadow-sm checked:bg-cyan-500 checked:border-cyan-500 bg-slate-900 transition-colors duration-200" ${isDone ? 'checked disabled' : ''}>
+                                <input type="checkbox" id="task-${task.name}" data-task-name="${task.name}" class="peer h-6 w-6 cursor-pointer appearance-none rounded-md border-2 border-slate-500 shadow-sm checked:bg-cyan-500 checked:border-cyan-500 bg-slate-900 transition-colors duration-200" ${isDone ? 'checked disabled' : ''}>
                                 <svg class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none opacity-0 peer-checked:opacity-100 text-slate-900 transition-opacity duration-200" viewBox="0 0 14 10" fill="none"><path d="M1 5L4.5 8.5L13 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             </div>
-                            <label for="task-${sanitizeId(task.name)}" class="truncate text-base font-medium ${isDone ? 'text-gray-500 line-through' : 'text-gray-100'} cursor-pointer select-none">
+                            <label for="task-${task.name}" class="truncate text-base font-medium ${isDone ? 'text-gray-500 line-through' : 'text-gray-100'} cursor-pointer select-none">
                                 ${task.name}
                                 ${task.notes ? `<span class="block text-xs text-gray-400 font-normal mt-0.5">${task.notes}</span>` : ''}
                             </label>
                         </div>
-                        ${!isDone ? `<button onclick="deleteRoutineTaskByName('${task.name.replace(/'/g, "\\'")}')" class="text-gray-600 hover:text-red-500 ml-4 p-1 shrink-0"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>` : ''}
+                        ${!isDone ? `<button onclick="deleteRoutineTaskByName('${task.name}')" class="text-gray-600 hover:text-red-500 ml-4 p-1 shrink-0 no-print"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>` : ''}
                     `;
 
                     if (!isDone) {
@@ -862,7 +882,10 @@ var firebaseConfig =
                              e.target.disabled = true;
                              const success = await window.addLogEntry('Routine', `完成: ${task.name} (${category})`, task.name, category);
                              // The next renderRoutineTasks() call, triggered by the log change snapshot, will handle the state update and UI refresh.
-                             if (!success) { e.target.disabled = false; e.target.checked = false; }
+                             if (!success) { 
+                                 e.target.disabled = false; 
+                                 e.target.checked = false; 
+                             }
                         });
                     }
                     taskListContainer.appendChild(taskEl);
@@ -874,114 +897,132 @@ var firebaseConfig =
         const renderTimeline = (logs, container, isHistory = false, dateStr = getTodayDateString()) => {
             container.innerHTML = '';
             if (logs.length === 0) {
-                container.innerHTML = `<div class="flex flex-col items-center justify-center h-64 text-gray-600"><svg class="w-16 h-16 mb-2 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg><p>今日尚無紀錄，開始工作吧！</p></div>`;
+                container.innerHTML = `<div class="flex flex-col items-center justify-center h-64 text-gray-600"><svg class="w-16 h-16 mb-2 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg><p>${isHistory ? `日期 ${formatDisplayDate(dateStr)} 查無紀錄。` : '今日尚無紀錄，開始工作吧！'}</p></div>`;
                 return;
             }
 
             logs.forEach(log => {
                 const isRoutine = log.type === 'Routine';
-                const dotColor = isRoutine ? 'bg-blue-400 shadow-blue-400' : 'bg-green-400 shadow-green-400';
-                const tagColor = isRoutine ? 'bg-blue-900 text-blue-300' : 'bg-green-900 text-green-300';
-                const categoryLabel = log.category || (isRoutine ? '例行' : '一般');
+                const icon = isRoutine 
+                    ? `<svg class="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>`
+                    : `<svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+                
+                const dotClass = isRoutine ? 'bg-green-500 border-green-700' : 'bg-red-500 border-red-700';
 
-                const html = `
-                    <div class="timeline-item group">
-                        <div class="timeline-dot ${dotColor} shadow-md"></div>
-                        <div class="flex flex-col sm:flex-row sm:items-start justify-between bg-slate-800 rounded-lg p-3 border border-slate-700 hover:border-cyan-400 transition-colors">
+                const logItem = document.createElement('div');
+                logItem.className = 'timeline-item';
+                logItem.innerHTML = `
+                    <div class="timeline-dot ${dotClass}"></div>
+                    <div class="card p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300">
+                        <div class="flex justify-between items-start">
                             <div class="flex-1">
-                                <div class="flex items-center space-x-3 mb-1">
-                                    <span class="font-mono font-bold text-cyan-400 text-sm">${log.timeString}</span>
-                                    <span class="px-2 py-0.5 rounded text-xs font-medium ${tagColor}">${categoryLabel}</span>
-                                </div>
-                                <p class="text-gray-100 whitespace-pre-wrap leading-relaxed">${log.description}</p>
+                                <p class="text-sm font-bold text-gray-100 flex items-center mb-1">
+                                    ${icon}
+                                    <span class="ml-2">${log.description}</span>
+                                </p>
+                                <p class="text-xs text-gray-400 font-mono">
+                                    [${log.type}] ${log.category}
+                                </p>
                             </div>
-                            <button onclick="deleteDailyLog('${log.id}', '${dateStr}')" 
-                                class="no-print opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-500 transition-opacity p-2 sm:mt-0 mt-2 self-end sm:self-start">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                            </button>
+                            <div class="flex items-center space-x-3 shrink-0">
+                                <span class="text-sm font-mono text-cyan-400">${log.timeString}</span>
+                                <button onclick="deleteDailyLog('${log.id}', '${dateStr}')" class="text-gray-500 hover:text-red-500 no-print" title="刪除日誌">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 `;
-                container.insertAdjacentHTML('beforeend', html);
+                container.appendChild(logItem);
             });
         };
 
-        // --- History & Print ---
+
+        // --- History Modal Logic ---
         window.showHistoryModal = () => {
-            const today = getTodayDateString();
-            document.getElementById('history-date-picker').value = today;
             document.getElementById('history-modal').classList.remove('hidden');
-            fetchLogsForDate(today);
+            // 預設選擇今日日期
+            const today = getTodayDateString();
+            const datePicker = document.getElementById('history-date-picker');
+            datePicker.value = today;
+            fetchLogsForDate(today); // 載入今日的歷史紀錄
         };
-        window.closeHistoryModal = () => document.getElementById('history-modal').classList.add('hidden');
+
+        window.closeHistoryModal = () => {
+            document.getElementById('history-modal').classList.add('hidden');
+        };
 
         window.fetchLogsForDate = async (dateStr) => {
             const container = document.getElementById('history-log-entries');
-            container.innerHTML = '<div class="text-center py-4"><div class="animate-spin h-6 w-6 border-2 border-cyan-500 border-t-transparent rounded-full mx-auto"></div></div>';
-            
+            container.innerHTML = `<p class="text-gray-500 text-center py-10">載入中...</p>`;
+
+            if (!isAuthReady || !userId) {
+                 container.innerHTML = `<p class="text-red-400 text-center py-10">驗證失敗，無法查詢歷史紀錄。</p>`;
+                 return;
+            }
+
             try {
-                const snapshot = await getDocs(getDailyLogCollectionRef(dateStr));
-                const logs = [];
-                snapshot.forEach(doc => logs.push({ id: doc.id, ...doc.data() }));
-                logs.sort((a, b) => a.timestamp - b.timestamp); // Chronological for history
-                renderTimeline(logs, container, true, dateStr);
-                // Print mode uses white background, so we fix the dot color for history view if it's rendered here
-                container.querySelectorAll('.timeline-dot').forEach(dot => {
-                     dot.style.backgroundColor = '#1e293b'; // Slate 800
-                     dot.style.boxShadow = '0 0 0 3px #0f172a'; // Slate 900
+                // 獲取指定日期的日誌集合
+                const logCollectionRef = getDailyLogCollectionRef(dateStr);
+                const querySnapshot = await getDocs(logCollectionRef);
+
+                const historyLogs = [];
+                querySnapshot.forEach(doc => {
+                    historyLogs.push({ id: doc.id, ...doc.data() });
                 });
+                
+                historyLogs.sort((a, b) => b.timestamp - a.timestamp); // 排序
+
+                renderTimeline(historyLogs, container, true, dateStr);
+
             } catch (e) {
-                container.innerHTML = `<p class="text-red-400 text-center">載入失敗: ${e.message}</p>`;
+                console.error("Error fetching history logs:", e);
+                container.innerHTML = `<p class="text-red-400 text-center py-10">查詢歷史紀錄失敗: ${e.message}</p>`;
             }
         };
 
+        // --- Print View Logic ---
         window.togglePrintView = () => {
-            const content = document.getElementById('daily-log-timeline').innerHTML;
-            const date = document.getElementById('header-date').textContent;
-            const stats = {
-                routine: document.getElementById('stat-routine').textContent,
-                adhoc: document.getElementById('stat-adhoc').textContent
-            };
-
-            const printContainer = document.getElementById('print-content');
+            const printModal = document.getElementById('print-modal');
+            const printContent = document.getElementById('print-content');
             
-            // Revert colors for print (white background)
-            let printContentHtml = content.replace(/bg-slate-800/g, 'bg-gray-100')
-                                          .replace(/bg-slate-700/g, 'bg-gray-200')
-                                          .replace(/border-slate-700/g, 'border-gray-300')
-                                          .replace(/text-gray-100/g, 'text-gray-800')
-                                          .replace(/text-gray-500/g, 'text-gray-600')
-                                          .replace(/text-cyan-400/g, 'text-indigo-600')
-                                          .replace(/text-blue-300/g, 'text-blue-800')
-                                          .replace(/text-green-300/g, 'text-green-800')
-                                          .replace(/bg-blue-900/g, 'bg-blue-100')
-                                          .replace(/bg-green-900/g, 'bg-green-100');
+            // 複製主日誌區塊的內容到列印視窗
+            const logBlock = document.querySelector('.lg\\:col-span-8 > .card:last-child').cloneNode(true);
 
-            printContainer.innerHTML = `
-                <div class="mb-6 border-b pb-4 border-gray-300">
-                    <h1 class="text-2xl font-bold text-gray-900">工作日誌報表</h1>
-                    <p class="text-gray-600">日期: ${date}</p>
-                </div>
-                <div class="flex space-x-8 mb-8 bg-gray-100 p-4 rounded-lg text-gray-800">
-                    <div><span class="text-gray-600 text-sm">例行事項 (Routine):</span> <span class="font-bold text-lg">${stats.routine}</span></div>
-                    <div><span class="text-gray-600 text-sm">臨時狀況 (Ad-hoc):</span> <span class="font-bold text-lg">${stats.adhoc}</span></div>
-                </div>
-                <div class="space-y-4">
-                    ${printContentHtml}
+            // 清理複製的內容中的非列印元素
+            [logBlock].forEach(block => {
+                block.querySelectorAll('.no-print').forEach(el => el.remove());
+                block.querySelectorAll('button').forEach(el => el.remove());
+            });
+
+            // 移除日誌區塊中的日誌計數標籤
+            logBlock.querySelector('#log-count-badge')?.remove();
+            
+            // 替換標題，使其適合列印
+            const logTitleEl = logBlock.querySelector('h2');
+            if (logTitleEl) {
+                logTitleEl.textContent = `日誌時間軸 (${formatDisplayDate(getTodayDateString())})`;
+            }
+
+            const headerHTML = `
+                <div class="text-center mb-6">
+                    <h1 class="text-3xl font-extrabold text-gray-800">工作日誌報告</h1>
+                    <p class="text-gray-600 mt-1">日期: ${formatDisplayDate(getTodayDateString())}</p>
+                    <p class="text-gray-600">用戶 ID: ${userId}</p>
                 </div>
             `;
+
+            printContent.innerHTML = headerHTML;
+            printContent.appendChild(logBlock);
             
-            // Final cleanup for print-specific styles
-            printContainer.querySelectorAll('.no-print').forEach(el => el.remove());
-            printContainer.querySelectorAll('.timeline-dot').forEach(dot => {
-                 dot.style.backgroundColor = 'white';
-                 dot.style.boxShadow = '0 0 0 3px #f3f4f6';
-            });
-            
-            document.getElementById('print-modal').classList.remove('hidden');
+            // 顯示模態視窗
+            printModal.classList.remove('hidden');
         };
 
+
+        // --- Init ---
         window.onload = initFirebase;
+
     </script>
 </body>
 </html>
