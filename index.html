@@ -307,9 +307,8 @@
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-// 確保您在整個檔案中只使用一次 'const firebaseConfig'
-
-// 1. 定義外部或本地的 Firebase 配置（使用一個新的變數名，例如 LOCAL_FIREBASE_CONFIG）
+// --- 核心 Firebase 配置與環境變數處理 ---
+// 目的：確保在 Canvas 環境內使用全域變數，在外部環境（如 GitHub Pages）使用本地配置。
 // 【重要警告】如果要在外部部署 (如 GitHub Pages)，請將下面的配置替換為您自己的 Firebase 專案設定！
 const LOCAL_FIREBASE_CONFIG = {
     apiKey: "AIzaSyAXnSDK_kY4Aa8XvL0M_Md9kA4Wdow_Uvs",
@@ -322,19 +321,19 @@ const LOCAL_FIREBASE_CONFIG = {
 };
 
 
-// 2. 宣告並賦值給最終的 firebaseConfig 變數（這是唯一使用 const firebaseConfig 的地方）
-// 檢查 Canvas 環境變數是否存在，如果不存在，則使用 LOCAL_FIREBASE_CONFIG。
-
-// 獲取 Canvas 專案 ID 和 Auth Token
+// 1. 安全地獲取 Canvas 專案 ID 和 Auth Token，如果未定義則使用預設值/null
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
+// 2. 宣告並賦值給最終的 firebaseConfig 變數（這是唯一使用 const firebaseConfig 的地方）
+// 檢查 Canvas 環境變數是否存在且有效，如果不存在，則使用 LOCAL_FIREBASE_CONFIG。
 const firebaseConfig = 
     (typeof __firebase_config !== 'undefined' && __firebase_config !== 'null' && __firebase_config.length > 2) 
         ? JSON.parse(__firebase_config) 
         : LOCAL_FIREBASE_CONFIG; 
 
-// 現在您可以安全地使用 firebaseConfig 來初始化 Firebase 了
+// 現在您可以安全地使用 firebaseConfig、appId 和 initialAuthToken 來初始化 Firebase 了
+// 例如：const app = initializeApp(firebaseConfig);
 // const app = initializeApp(firebaseConfig);
         let app, db, auth, userId = null, isAuthReady = false;
         let routineTasks = []; // Example: [{ name: "Task A", category: "ERP", notes: "" }]
