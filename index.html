@@ -241,7 +241,8 @@
         
         <!-- Footer Info -->
         <div class="mt-8 text-center text-xs text-gray-600 no-print">
-            <p>App ID: <span id="app-id-display" class="font-mono"></span> | User ID: <span id="user-id-display" class="font-mono"></span></p>
+            <!-- 仍然顯示用戶 ID，但資料已改為 App ID 級別共享 -->
+            <p>App ID: <span id="app-id-display" class="font-mono"></span> | User ID (Current Session): <span id="user-id-display" class="font-mono"></span></p>
         </div>
 
     </div>
@@ -400,7 +401,7 @@
 
             // 更新數字統計
             document.getElementById('stat-routine').textContent = routineCount;
-            // FIX: 更新 Ad-hoc 統計數字的顏色，已在 HTML 中修改為 text-red-400
+            // 更新 Ad-hoc 統計數字的顏色，已在 HTML 中修改為 text-red-400
             document.getElementById('stat-adhoc').textContent = adhocCount;
             document.getElementById('log-count-badge').textContent = `${dailyLogs.length} ENTRIES`;
 
@@ -510,9 +511,25 @@
             return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
         };
 
-        // Firestore 路徑定義
-        const getRoutineTasksDocRef = () => userId ? doc(db, 'artifacts', appId, 'users', userId, 'config', 'routine_tasks') : null;
-        const getDailyLogCollectionRef = (dateString = getTodayDateString()) => userId ? collection(db, 'artifacts', appId, 'users', userId, 'daily_logs', dateString, 'entries') : null;
+        // --- Firebase 路徑定義 (FIX: 變更為公開路徑以實現跨瀏覽器持久化) ---
+        /**
+         * 獲取例行任務配置文件的 Firestore Doc Reference (文件引用)。
+         * 使用公開路徑: /artifacts/{appId}/public/data/routine_tasks/config
+         * FIX: 增加 'config' 作為最終 Document ID，確保路徑有偶數個 segment (6 segments)。
+         * @returns {object} Firestore Document Reference
+         */
+        const getRoutineTasksDocRef = () => doc(db, 'artifacts', appId, 'public', 'data', 'routine_tasks', 'config');
+
+        /**
+         * 獲取每日日誌集合的 Firestore Collection Reference (集合引用)。
+         * 使用公開路徑: /artifacts/{appId}/public/data/daily_logs/{dateString}/entries
+         * 該路徑包含 7 個 segment (奇數)，符合 Collection Reference 規範。
+         * @param {string} dateString - 日期字符串 (e.g., '2025-11-27')
+         * @returns {object} Firestore Collection Reference
+         */
+        const getDailyLogCollectionRef = (dateString = getTodayDateString()) => collection(db, 'artifacts', appId, 'public', 'data', 'daily_logs', dateString, 'entries');
+        // --- End FIX ---
+
 
         // --- Firebase Core ---
         const initFirebase = async () => {
@@ -567,7 +584,8 @@
 
         // --- Logic: Routine Tasks (with Category Grouping) ---
         const loadRoutineTasks = () => {
-            if (!isAuthReady) return;
+            // 注意: 由於改為公開路徑，這裡不再檢查 userId
+            if (!isAuthReady) return; 
             onSnapshot(getRoutineTasksDocRef(), (docSnap) => {
                 if (docSnap.exists() && Array.isArray(docSnap.data().tasks)) {
                     routineTasks = docSnap.data().tasks.map(task => ({
@@ -587,11 +605,12 @@
         };
 
         const saveRoutineTasks = async (tasks) => {
-            if (!isAuthReady || !userId) {
+            if (!isAuthReady) {
                  showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
                  return;
             }
             try {
+                // 由於是公開路徑，不需要 userId 參數
                 await setDoc(getRoutineTasksDocRef(), { tasks });
             } catch (e) {
                 console.error("Save Routine Task Error:", e);
@@ -604,7 +623,7 @@
             const name = document.getElementById('new-routine-task-name').value.trim();
             const notes = document.getElementById('new-routine-task-notes').value.trim();
             
-            if (!isAuthReady || !userId) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
+            if (!isAuthReady) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
             if (!name) return showMessage('error', '錯誤', '任務名稱不可為空');
             
             if (routineTasks.some(t => t.name === name)) return showMessage('error', '重複', '任務名稱已存在');
@@ -617,7 +636,7 @@
 
         // Deletes by unique name, not by index, to handle sorting/grouping changes
         window.deleteRoutineTaskByName = (taskName) => {
-            if (!isAuthReady || !userId) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
+            if (!isAuthReady) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
             const taskIndex = routineTasks.findIndex(t => t.name === taskName);
             if (taskIndex === -1) return;
             const task = routineTasks[taskIndex];
@@ -627,6 +646,7 @@
                     // Cascade delete logs (only for today for simplicity)
                     const logsToDelete = dailyLogs.filter(l => l.type === 'Routine' && l.taskName === task.name);
                     for (const log of logsToDelete) {
+                        // 由於是公開路徑，這裡不再需要 userId 檢查
                         await deleteDoc(doc(getDailyLogCollectionRef(), log.id));
                     }
                     // Update list
@@ -663,7 +683,7 @@
         };
 
         window.importRoutineTasks = () => {
-            if (!isAuthReady || !userId) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
+            if (!isAuthReady) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
             const fileInput = document.createElement('input');
             fileInput.type = 'file';
             fileInput.accept = 'application/json';
@@ -745,12 +765,12 @@
         window.addLogEntry = async (type, description, taskName = null, category = '一般') => {
             if (!description) return false;
             // 修正重點：確保在寫入前已通過驗證
-            if (!isAuthReady || !userId) {
+            if (!isAuthReady) {
                  showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，無法寫入日誌。');
                  return false;
             }
             try {
-                // *** 寫入日誌到 Firestore ***
+                // *** 寫入日誌到 Firestore (使用公開路徑) ***
                 await addDoc(getDailyLogCollectionRef(), {
                     type, description, taskName, category,
                     timestamp: Date.now(),
@@ -778,10 +798,11 @@
 
         window.deleteDailyLog = (id, dateStr) => {
             // 檢查日誌刪除權限
-            if (!isAuthReady || !userId) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
+            if (!isAuthReady) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
             
             showMessage('confirm', '刪除日誌', '確定要刪除這筆紀錄嗎？若是例行任務將會變回未完成狀態。', async () => {
                 try {
+                    // 由於是公開路徑，這裡不再需要 userId 檢查
                     await deleteDoc(doc(getDailyLogCollectionRef(dateStr), id));
                     if (dateStr !== getTodayDateString()) fetchLogsForDate(dateStr); // Refresh history if needed
                 } catch (e) {
@@ -963,7 +984,7 @@
             const container = document.getElementById('history-log-entries');
             container.innerHTML = `<p class="text-gray-500 text-center py-10">載入中...</p>`;
 
-            if (!isAuthReady || !userId) {
+            if (!isAuthReady) {
                  container.innerHTML = `<p class="text-red-400 text-center py-10">驗證失敗，無法查詢歷史紀錄。</p>`;
                  return;
             }
@@ -1015,7 +1036,8 @@
                 <div class="text-center mb-6">
                     <h1 class="text-3xl font-extrabold text-gray-800">工作日誌報告</h1>
                     <p class="text-gray-600 mt-1">日期: ${formatDisplayDate(getTodayDateString())}</p>
-                    <p class="text-gray-600">用戶 ID: ${userId}</p>
+                    <!-- 由於數據已共享，這裡只顯示應用程式ID -->
+                    <p class="text-gray-600">App ID: ${appId}</p> 
                 </div>
             `;
 
