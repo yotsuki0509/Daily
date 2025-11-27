@@ -309,15 +309,16 @@
 
         // 【重要警告】如果要在外部部署 (如 GitHub Pages)，請將下面的 LOCAL_FIREBASE_CONFIG 替換為您自己的 Firebase 專案設定！
         // 否則 Firebase 無法連線，將會導致圖表無法載入資料，以及任務列表點擊失效。
-        const LOCAL_FIREBASE_CONFIG = {
-            apiKey: "YOUR_API_KEY_HERE_FOR_EXTERNAL_HOSTING", // <-- 必須替換為您自己的 API Key
-            authDomain: "example-project.firebaseapp.com",
-            projectId: "example-project",
-            storageBucket: "example-project.appspot.com",
-            messagingSenderId: "1234567890",
-            appId: "1:234567890:web:abcdef12345",
-            measurementId: "G-XXXXXX"
-        };
+const firebaseConfig = {
+  apiKey: "AIzaSyAXnSDK_kY4Aa8XvL0M_Md9kA4Wdow_Uvs",
+  authDomain: "daily-23c82.firebaseapp.com",
+  projectId: "daily-23c82",
+  storageBucket: "daily-23c82.firebasestorage.app",
+  messagingSenderId: "574719251457",
+  appId: "1:574719251457:web:30aadb364406783b175c00",
+  measurementId: "G-6JN0N6BJHH"
+};
+
 
         const firebaseConfig = 
             (typeof __firebase_config !== 'undefined' && __firebase_config !== 'null' && __firebase_config.length > 2) 
