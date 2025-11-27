@@ -307,14 +307,16 @@
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
+        // 【重要警告】如果要在外部部署 (如 GitHub Pages)，請將下面的 LOCAL_FIREBASE_CONFIG 替換為您自己的 Firebase 專案設定！
+        // 否則 Firebase 無法連線，將會導致圖表無法載入資料，以及任務列表點擊失效。
         const LOCAL_FIREBASE_CONFIG = {
-            apiKey: "AIzaSyAXnSDK_kY4Aa8XvL0M_Md9kA4Wdow_Uvs",
-            authDomain: "daily-23c82.firebaseapp.com",
-            projectId: "daily-23c82",
-            storageBucket: "daily-23c82.firebasestorage.app",
-            messagingSenderId: "574719251457",
-            appId: "1:574719251457:web:30aadb364406783b175c00",
-            measurementId: "G-6JN0N6BJHH"
+            apiKey: "YOUR_API_KEY_HERE_FOR_EXTERNAL_HOSTING", // <-- 必須替換為您自己的 API Key
+            authDomain: "example-project.firebaseapp.com",
+            projectId: "example-project",
+            storageBucket: "example-project.appspot.com",
+            messagingSenderId: "1234567890",
+            appId: "1:234567890:web:abcdef12345",
+            measurementId: "G-XXXXXX"
         };
 
         const firebaseConfig = 
@@ -464,7 +466,7 @@
             modal.classList.remove('hidden');
         };
 
-        // *** FIX: 使用 ID 替代 DOM 遍歷，解決匯入後可能發生的 null 錯誤 ***
+        // **Accordion Toggle Logic**
         /**
          * 展開或收合任務類別的內容。
          * @param {HTMLElement} button 點擊的按鈕
@@ -473,11 +475,9 @@
          * @param {string} iconId 旋轉圖標的 ID
          */
         window.toggleAccordion = (button, category, contentId, iconId) => {
-            // 直接通過 ID 獲取元素，這是最可靠的方式
             const content = document.getElementById(contentId);
             const icon = document.getElementById(iconId);
             
-            // 關鍵空值檢查: 防止 "Cannot read properties of null (reading 'classList')"
             if (!content || !icon) {
                 console.error("Accordion Error: Content or icon element not found for category:", category, { contentId, iconId });
                 return;
@@ -487,12 +487,12 @@
                 // Open
                 content.classList.remove('hidden');
                 icon.classList.add('rotate-180');
-                openCategories.add(category);
+                openCategories.add(category); // 紀錄開啟狀態以維持持久性
             } else {
                 // Close
                 content.classList.add('hidden');
                 icon.classList.remove('rotate-180');
-                openCategories.delete(category);
+                openCategories.delete(category); // 移除開啟狀態
             }
         };
 
@@ -518,8 +518,18 @@
             document.getElementById('app-id-display').textContent = appId;
             document.getElementById('history-date-picker').max = getTodayDateString();
 
-            if (!firebaseConfig?.apiKey) {
-                document.getElementById('loading-overlay').innerHTML = `<p class="text-red-400 font-bold text-xl">設定錯誤：缺少 Firebase API Key</p>`;
+            if (!firebaseConfig?.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY_HERE_FOR_EXTERNAL_HOSTING") {
+                document.getElementById('loading-overlay').innerHTML = `
+                    <div class="text-center p-6 bg-red-900/50 rounded-xl border-2 border-red-500 max-w-lg mx-auto">
+                        <p class="text-xl font-bold text-red-400 mb-3">Firebase 初始化失敗 (外部部署)</p>
+                        <p class="text-sm text-gray-300">
+                            錯誤原因：您尚未在程式碼中替換 
+                            <code class="bg-red-800 p-1 rounded font-mono">LOCAL_FIREBASE_CONFIG</code> 
+                            為您**有效的** Firebase 專案設定。<br><br>
+                            圖表和資料存取功能需要此設定才能運作。
+                        </p>
+                    </div>
+                `;
                 return;
             }
 
@@ -788,9 +798,9 @@
                 const categoryHeader = document.createElement('div');
                 categoryHeader.className = "relative mb-2";
 
-                // *** FIX: 將 contentId 和 iconId 明確傳遞給 toggleAccordion ***
+                // 修正後的 onclick，確保類別名稱 (category) 正確傳遞
                 categoryHeader.innerHTML = `
-                    <button onclick="toggleAccordion(this, '${category}', '${contentId}', '${iconId}')" class="${headerBaseClass} ${headerStyleClass}">
+                    <button onclick="toggleAccordion(this, '${category}', '${contentId}', '${iconId}')" class="${headerBaseClass} ${headerStyleClass} bg-slate-700 hover:bg-slate-600">
                         <!-- 進度條 (Progress Bar) - 放在按鈕內部，作為背景層 -->
                         <div class="absolute inset-0 h-full transition-all duration-300 pointer-events-none" style="width: ${progressPercent}%;">
                             <div class="h-full ${progressColor}"></div>
@@ -811,7 +821,7 @@
                 `;
                 list.appendChild(categoryHeader);
 
-                const taskListContainer = categoryHeader.querySelector('div.space-y-1');
+                const taskListContainer = categoryHeader.querySelector(`div#${contentId}`); // 使用 ID 選擇器確保準確性
 
                 tasks.forEach((task) => {
                     const isDone = completedRoutineTaskNames.has(task.name);
@@ -825,15 +835,15 @@
                     taskEl.innerHTML = `
                         <div class="flex items-center space-x-3 flex-1 overflow-hidden">
                             <div class="relative flex items-center shrink-0">
-                                <input type="checkbox" id="task-${task.name}" data-task-name="${task.name}" class="peer h-6 w-6 cursor-pointer appearance-none rounded-md border-2 border-slate-500 shadow-sm checked:bg-cyan-500 checked:border-cyan-500 bg-slate-900 transition-colors duration-200" ${isDone ? 'checked disabled' : ''}>
+                                <input type="checkbox" id="task-${sanitizeId(task.name)}" data-task-name="${task.name}" class="peer h-6 w-6 cursor-pointer appearance-none rounded-md border-2 border-slate-500 shadow-sm checked:bg-cyan-500 checked:border-cyan-500 bg-slate-900 transition-colors duration-200" ${isDone ? 'checked disabled' : ''}>
                                 <svg class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none opacity-0 peer-checked:opacity-100 text-slate-900 transition-opacity duration-200" viewBox="0 0 14 10" fill="none"><path d="M1 5L4.5 8.5L13 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             </div>
-                            <label for="task-${task.name}" class="truncate text-base font-medium ${isDone ? 'text-gray-500 line-through' : 'text-gray-100'} cursor-pointer select-none">
+                            <label for="task-${sanitizeId(task.name)}" class="truncate text-base font-medium ${isDone ? 'text-gray-500 line-through' : 'text-gray-100'} cursor-pointer select-none">
                                 ${task.name}
                                 ${task.notes ? `<span class="block text-xs text-gray-400 font-normal mt-0.5">${task.notes}</span>` : ''}
                             </label>
                         </div>
-                        ${!isDone ? `<button onclick="deleteRoutineTaskByName('${task.name}')" class="text-gray-600 hover:text-red-500 ml-4 p-1 shrink-0"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>` : ''}
+                        ${!isDone ? `<button onclick="deleteRoutineTaskByName('${task.name.replace(/'/g, "\\'")}')" class="text-gray-600 hover:text-red-500 ml-4 p-1 shrink-0"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>` : ''}
                     `;
 
                     if (!isDone) {
