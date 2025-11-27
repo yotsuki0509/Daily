@@ -511,24 +511,32 @@
             return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
         };
 
-        // --- Firebase 路徑定義 (FIX: 變更為公開路徑以實現跨瀏覽器持久化) ---
+        // --- Firebase 路徑定義 (已修復 `routine_tasks` 錯誤，並將 `daily_logs` 切換回私人路徑) ---
         /**
          * 獲取例行任務配置文件的 Firestore Doc Reference (文件引用)。
-         * 使用公開路徑: /artifacts/{appId}/public/data/routine_tasks/config
-         * FIX: 增加 'config' 作為最終 Document ID，確保路徑有偶數個 segment (6 segments)。
+         * 使用公開路徑 (6 segments - EVEN): /artifacts/{appId}/public/data/routine_tasks/config
+         * 此路徑用於跨瀏覽器/用戶共享的任務列表。
          * @returns {object} Firestore Document Reference
          */
         const getRoutineTasksDocRef = () => doc(db, 'artifacts', appId, 'public', 'data', 'routine_tasks', 'config');
 
         /**
          * 獲取每日日誌集合的 Firestore Collection Reference (集合引用)。
-         * 使用公開路徑: /artifacts/{appId}/public/data/daily_logs/{dateString}/entries
-         * 該路徑包含 7 個 segment (奇數)，符合 Collection Reference 規範。
+         * 使用私人路徑 (8 segments - EVEN, then 1 segment collection - ODD): /artifacts/{appId}/users/{userId}/daily_logs/{dateString}/entries
+         * 此路徑用於用戶的私人日誌，更符合預設的安全規則。
          * @param {string} dateString - 日期字符串 (e.g., '2025-11-27')
          * @returns {object} Firestore Collection Reference
          */
-        const getDailyLogCollectionRef = (dateString = getTodayDateString()) => collection(db, 'artifacts', appId, 'public', 'data', 'daily_logs', dateString, 'entries');
-        // --- End FIX ---
+        const getDailyLogCollectionRef = (dateString = getTodayDateString()) => {
+             // 由於 subscribeToDailyLogs 在 onAuthStateChanged 之後執行，userId 應該存在
+             if (!userId) {
+                 // 這是應對極端情況的防護，避免在未登入時呼叫
+                 throw new Error("Authentication error: userId is required for private log path.");
+             }
+             // Path: artifacts / appId / users / userId / daily_logs / dateString / entries
+             return collection(db, 'artifacts', appId, 'users', userId, 'daily_logs', dateString, 'entries');
+        }
+        // --- End Path Definition FIX ---
 
 
         // --- Firebase Core ---
@@ -558,7 +566,6 @@
                         isAuthReady = true;
                         document.getElementById('user-id-display').textContent = userId;
                         
-                        // FIX: 在顯示容器和日誌訂閱後立即初始化圖表
                         initChart(); 
 
                         // 驗證成功後才開始載入和訂閱資料
@@ -584,7 +591,6 @@
 
         // --- Logic: Routine Tasks (with Category Grouping) ---
         const loadRoutineTasks = () => {
-            // 注意: 由於改為公開路徑，這裡不再檢查 userId
             if (!isAuthReady) return; 
             onSnapshot(getRoutineTasksDocRef(), (docSnap) => {
                 if (docSnap.exists() && Array.isArray(docSnap.data().tasks)) {
@@ -610,7 +616,6 @@
                  return;
             }
             try {
-                // 由於是公開路徑，不需要 userId 參數
                 await setDoc(getRoutineTasksDocRef(), { tasks });
             } catch (e) {
                 console.error("Save Routine Task Error:", e);
@@ -646,7 +651,6 @@
                     // Cascade delete logs (only for today for simplicity)
                     const logsToDelete = dailyLogs.filter(l => l.type === 'Routine' && l.taskName === task.name);
                     for (const log of logsToDelete) {
-                        // 由於是公開路徑，這裡不再需要 userId 檢查
                         await deleteDoc(doc(getDailyLogCollectionRef(), log.id));
                     }
                     // Update list
@@ -736,41 +740,48 @@
 
         // --- Logic: Logs ---
         const subscribeToDailyLogs = () => {
-            if (!isAuthReady) return;
-            // 訂閱今日日誌
-            onSnapshot(getDailyLogCollectionRef(), (snapshot) => {
-                dailyLogs = [];
-                completedRoutineTaskNames.clear();
-                
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    dailyLogs.push({ id: doc.id, ...data });
-                    if (data.type === 'Routine' && data.taskName) {
-                        completedRoutineTaskNames.add(data.taskName);
-                    }
+            if (!isAuthReady || !userId) return;
+            // 訂閱今日日誌 (使用私人路徑)
+            try {
+                onSnapshot(getDailyLogCollectionRef(), (snapshot) => {
+                    dailyLogs = [];
+                    completedRoutineTaskNames.clear();
+                    
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        dailyLogs.push({ id: doc.id, ...data });
+                        if (data.type === 'Routine' && data.taskName) {
+                            completedRoutineTaskNames.add(data.taskName);
+                        }
+                    });
+                    
+                    dailyLogs.sort((a, b) => b.timestamp - a.timestamp); // Sort Newest First for Timeline
+                    
+                    // 呼叫更新，確保圖表和列表狀態同步
+                    renderTimeline(dailyLogs, document.getElementById('daily-log-timeline'));
+                    renderRoutineTasks(); // Update checkbox states and redraw list
+                    updateChart(); // Update dashboard
+                }, (error) => {
+                    console.error("Error subscribing to daily logs:", error);
+                    // 打印更詳細的錯誤資訊到 Console，幫助除錯
+                    console.error("Firestore Subscription Error Details:", error.code, error.message);
+                    showMessage('error', '即時錯誤', '無法訂閱今日日誌。請檢查網路或 Firestore 權限。');
                 });
-                
-                dailyLogs.sort((a, b) => b.timestamp - a.timestamp); // Sort Newest First for Timeline
-                
-                // 呼叫更新，確保圖表和列表狀態同步
-                renderTimeline(dailyLogs, document.getElementById('daily-log-timeline'));
-                renderRoutineTasks(); // Update checkbox states and redraw list
-                updateChart(); // Update dashboard
-            }, (error) => {
-                console.error("Error subscribing to daily logs:", error);
-                showMessage('error', '即時錯誤', '無法訂閱今日日誌。請檢查網路或 Firestore 權限。');
-            });
+            } catch(e) {
+                 console.error("Error setting up daily log subscription:", e);
+                 showMessage('error', '訂閱錯誤', '設定日誌訂閱時發生錯誤，請檢查主控台。');
+            }
         };
 
         window.addLogEntry = async (type, description, taskName = null, category = '一般') => {
             if (!description) return false;
-            // 修正重點：確保在寫入前已通過驗證
-            if (!isAuthReady) {
+            // 修正重點：確保在寫入前已通過驗證且 userId 可用
+            if (!isAuthReady || !userId) {
                  showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，無法寫入日誌。');
                  return false;
             }
             try {
-                // *** 寫入日誌到 Firestore (使用公開路徑) ***
+                // *** 寫入日誌到 Firestore (使用私人路徑) ***
                 await addDoc(getDailyLogCollectionRef(), {
                     type, description, taskName, category,
                     timestamp: Date.now(),
@@ -798,11 +809,10 @@
 
         window.deleteDailyLog = (id, dateStr) => {
             // 檢查日誌刪除權限
-            if (!isAuthReady) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
+            if (!isAuthReady || !userId) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
             
             showMessage('confirm', '刪除日誌', '確定要刪除這筆紀錄嗎？若是例行任務將會變回未完成狀態。', async () => {
                 try {
-                    // 由於是公開路徑，這裡不再需要 userId 檢查
                     await deleteDoc(doc(getDailyLogCollectionRef(dateStr), id));
                     if (dateStr !== getTodayDateString()) fetchLogsForDate(dateStr); // Refresh history if needed
                 } catch (e) {
@@ -984,7 +994,7 @@
             const container = document.getElementById('history-log-entries');
             container.innerHTML = `<p class="text-gray-500 text-center py-10">載入中...</p>`;
 
-            if (!isAuthReady) {
+            if (!isAuthReady || !userId) {
                  container.innerHTML = `<p class="text-red-400 text-center py-10">驗證失敗，無法查詢歷史紀錄。</p>`;
                  return;
             }
