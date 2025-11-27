@@ -303,10 +303,6 @@
 
         // 設定 Firebase Debug 日誌
         // setLogLevel('Debug');
-
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
 // --- 核心 Firebase 配置與環境變數處理 ---
 // 目的：確保在 Canvas 環境內使用全域變數，在外部環境（如 GitHub Pages）使用本地配置。
 // 警告：為避免與用戶主文件中的重複宣告衝突，此處使用 'var' 而非 'const'。
