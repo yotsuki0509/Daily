@@ -3,104 +3,125 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>每日工作日誌 - 戰情室 (已修復版)</title>
+    <title>每日工作日誌 - 戰情室 (資料修復版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body {
-            font-family: 'Microsoft YaHei', 'Microsoft JhengHei', 'Inter', sans-serif;
-            background-color: #0f172a;
-            color: #e2e8f0;
-        }
-        .card {
-            background-color: #1e293b;
-            border: 1px solid #334155;
-            border-radius: 0.75rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
-            transition: all 0.3s ease;
-        }
-        .card:hover { border-color: #06b6d4; }
-        .loading-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #0f172a; display: flex; justify-content: center; align-items: center; z-index: 1000;
-        }
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.75); display: flex; justify-content: center; align-items: center; z-index: 100;
-        }
+        body { font-family: 'Microsoft YaHei', 'Microsoft JhengHei', sans-serif; background-color: #0f172a; color: #e2e8f0; }
+        .card { background-color: #1e293b; border: 1px solid #334155; border-radius: 0.75rem; transition: all 0.3s ease; }
+        .card:hover { border-color: #06b6d4; box-shadow: 0 0 15px rgba(6, 182, 212, 0.2); }
+        .timeline-item { position: relative; padding-left: 2rem; padding-bottom: 1rem; border-left: 2px solid #334155; }
+        .timeline-dot { position: absolute; left: -9px; top: 4px; width: 16px; height: 16px; border-radius: 50%; background: #0f172a; border: 2px solid #06b6d4; }
+        .loading-overlay { position: fixed; inset: 0; background: #0f172a; display: flex; justify-content: center; align-items: center; z-index: 1000; transition: opacity 0.5s; }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 100; }
+        .line-through { text-decoration: line-through; color: #64748b; opacity: 0.7; }
         @media print { .no-print { display: none !important; } }
     </style>
 </head>
-<body>
+<body class="p-4">
+    <!-- Loading 畫面 -->
     <div id="loading-overlay" class="loading-overlay">
         <div class="text-center">
-            <svg class="animate-spin h-10 w-10 text-cyan-400 mb-4 mx-auto" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p>正在連線至資料庫...</p>
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400 mx-auto mb-4"></div>
+            <p class="text-cyan-400 font-bold">正在連線至資料庫 [default-app-id]...</p>
+            <button onclick="forceStart()" class="mt-4 text-xs text-slate-500 underline">若連線緩慢請點此跳過</button>
         </div>
     </div>
 
-    <div class="container mx-auto p-4 max-w-7xl" id="app-container" style="display: none;">
-        <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 bg-slate-800 p-6 rounded-xl card border-cyan-400 border-l-4">
+    <div class="container mx-auto max-w-7xl" id="app-main" style="display:none;">
+        <header class="card p-6 border-l-4 border-cyan-500 mb-6 flex flex-col md:flex-row justify-between items-center">
             <div>
-                <h1 class="text-2xl font-bold text-cyan-400">工作日誌   - Crafted by 勝全   Powered by AI</h1>
-                <p class="text-sm text-gray-400" id="header-date"></p>
+                <h1 class="text-2xl font-bold text-cyan-400 tracking-tight">工作日誌戰情室</h1>
+                <p id="current-date-display" class="text-sm text-slate-400 font-mono"></p>
             </div>
-            <div class="flex space-x-2 no-print">
-                <button onclick="showHistoryModal()" class="bg-indigo-600 px-4 py-2 rounded-lg text-sm">歷史紀錄</button>
-                <button onclick="showUserSettingsModal()" class="bg-cyan-600 px-4 py-2 rounded-lg text-sm">帳號切換</button>
+            <div class="flex space-x-2 mt-4 md:mt-0 no-print">
+                <button onclick="showHistory()" class="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg text-sm">歷史紀錄</button>
+                <button onclick="openUserModal()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm">帳號切換</button>
             </div>
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- 左側統計 -->
             <div class="lg:col-span-4 space-y-6">
                 <div class="card p-6">
-                    <h2 class="text-cyan-400 font-bold mb-4">工作比例分析</h2>
-                    <div class="h-48 relative">
-                        <canvas id="workChart"></canvas>
-                        <div id="chart-placeholder" class="absolute inset-0 flex items-center justify-center text-gray-500 text-sm hidden">尚無資料</div>
-                    </div>
+                    <h2 class="text-cyan-400 font-bold mb-4 flex justify-between">
+                        <span>[ANALYSIS] 統計</span>
+                        <span id="stat-total" class="text-xs text-slate-500">0 項目</span>
+                    </h2>
+                    <div class="h-48"><canvas id="workChart"></canvas></div>
                 </div>
+
                 <div class="card p-6 no-print">
-                    <h2 class="text-red-400 font-bold mb-3">臨時事項紀錄</h2>
-                    <input type="text" id="adhoc-task-description" placeholder="發生了什麼事？" class="w-full p-2 bg-slate-900 border border-slate-700 rounded mb-3 text-sm">
-                    <button onclick="logAdHocTask()" class="w-full bg-red-500 py-2 rounded font-bold text-sm">送出紀錄</button>
+                    <h3 class="text-red-400 font-bold mb-3">快速紀錄 (Ad-hoc)</h3>
+                    <select id="adhoc-cat" class="w-full bg-slate-900 border border-slate-700 rounded p-2 mb-2 text-sm text-white">
+                        <option>一般事項</option>
+                        <option>會議溝通</option>
+                        <option>維修除錯</option>
+                        <option>行政支援</option>
+                    </select>
+                    <input type="text" id="adhoc-input" placeholder="紀錄內容..." class="w-full bg-slate-900 border border-slate-700 rounded p-2 mb-3 text-sm text-white">
+                    <button onclick="submitAdhoc()" class="w-full bg-red-600 hover:bg-red-500 py-2 rounded font-bold text-sm text-white">儲存日誌</button>
                 </div>
             </div>
 
+            <!-- 右側任務與時間軸 -->
             <div class="lg:col-span-8 space-y-6">
+                <!-- 整合任務中心 -->
                 <div class="card p-6">
-                    <h2 class="text-cyan-400 font-bold mb-4">每日例行任務</h2>
-                    <div id="routine-tasks-list" class="space-y-2"></div>
+                    <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
+                        <h2 class="text-xl font-bold text-cyan-400">[TASK] 任務中心</h2>
+                        <button onclick="resetMonthly()" class="text-[10px] bg-slate-700 px-2 py-1 rounded text-slate-400 hover:text-red-400">重置每月狀態</button>
+                    </div>
+                    
+                    <div id="task-list-container" class="space-y-3">
+                        <!-- 分類與任務會顯示在此 -->
+                    </div>
+
+                    <div class="mt-6 border-t border-slate-700 pt-4 no-print">
+                        <div class="flex space-x-2">
+                            <button onclick="toggleNewTaskForm()" class="flex-1 bg-slate-800 border border-slate-600 py-1 text-sm rounded hover:bg-slate-700">新增任務項目</button>
+                            <button onclick="exportTasks()" class="w-20 bg-indigo-600 py-1 text-sm rounded">匯出</button>
+                            <button onclick="importTasks()" class="w-20 bg-indigo-600 py-1 text-sm rounded">匯入</button>
+                        </div>
+                        <div id="new-task-form" class="hidden mt-4 p-4 bg-slate-900 rounded-lg space-y-2 border border-cyan-900">
+                            <select id="new-type" class="w-full bg-slate-800 border-slate-700 p-2 text-sm rounded text-white">
+                                <option value="Daily">📅 每日例行</option>
+                                <option value="Monthly">🌙 每月長期</option>
+                            </select>
+                            <input type="text" id="new-cat" placeholder="分類 (如: ERP, 業務)" class="w-full bg-slate-800 border-slate-700 p-2 text-sm rounded text-white">
+                            <input type="text" id="new-name" placeholder="任務名稱" class="w-full bg-slate-800 border-slate-700 p-2 text-sm rounded text-white">
+                            <button onclick="saveNewTask()" class="w-full bg-cyan-600 py-2 text-sm font-bold rounded">確定儲存</button>
+                        </div>
+                    </div>
                 </div>
-                <div class="card p-6 min-h-[400px]">
-                    <h2 class="text-indigo-400 font-bold mb-4">今日工作時間軸</h2>
-                    <div id="daily-log-timeline" class="space-y-4"></div>
+
+                <!-- 時間軸 -->
+                <div class="card p-6 min-h-[300px]">
+                    <h2 class="text-indigo-400 font-bold mb-4 flex justify-between">
+                        <span>[LOG] 今日時間軸</span>
+                        <span id="log-count" class="text-xs text-slate-500">0 筆</span>
+                    </h2>
+                    <div id="timeline-container"></div>
                 </div>
             </div>
         </div>
 
-        <footer class="mt-8 text-center text-xs text-gray-600">
-            App ID: <span id="app-id-display" class="font-mono text-cyan-500"></span> | 
-            User ID: <span id="user-id-display" class="font-mono text-cyan-500"></span>
+        <footer class="mt-8 py-4 border-t border-slate-800 text-center text-[10px] text-slate-600 font-mono">
+            APP_ID: <span class="text-slate-400">default-app-id</span> | 
+            USER_ID: <span id="display-uid" class="text-slate-400"></span>
         </footer>
     </div>
 
-    <div id="user-settings-modal" class="modal-overlay hidden">
-        <div class="bg-slate-800 p-6 rounded-xl w-full max-w-md border border-slate-600">
-            <h3 class="text-xl font-bold text-cyan-400 mb-4">帳號切換</h3>
-            <div class="space-y-4">
-                <div class="bg-slate-900 p-3 rounded">
-                    <p class="text-xs text-gray-500">目前 ID</p>
-                    <p id="modal-current-user-id" class="font-mono text-green-400 font-bold"></p>
-                </div>
-                <input type="text" id="custom-user-id-input" placeholder="輸入您的自訂名稱" class="w-full p-3 bg-slate-900 border border-indigo-500 rounded text-white">
-                <div class="flex space-x-2">
-                    <button onclick="applyCustomUserId()" class="flex-1 bg-indigo-600 py-2 rounded font-bold">確認切換</button>
-                    <button onclick="closeUserSettingsModal()" class="px-4 py-2 bg-slate-700 rounded">取消</button>
-                </div>
+    <!-- 用戶切換 Modal -->
+    <div id="user-modal" class="modal-overlay hidden">
+        <div class="bg-slate-800 p-6 rounded-xl w-full max-w-sm border border-slate-600">
+            <h3 class="font-bold text-cyan-400 mb-4">帳號切換</h3>
+            <p class="text-xs text-slate-500 mb-1">當前 ID:</p>
+            <div id="current-id-box" class="bg-slate-900 p-2 rounded mb-4 font-mono text-green-400 text-sm break-all"></div>
+            <input type="text" id="id-input" placeholder="輸入自訂名稱" class="w-full bg-slate-900 border border-indigo-500 rounded p-3 mb-4 text-white">
+            <div class="flex space-x-2">
+                <button onclick="applyId()" class="flex-1 bg-indigo-600 py-2 rounded font-bold">確認切換</button>
+                <button onclick="closeUserModal()" class="flex-1 bg-slate-700 py-2 rounded text-white">取消</button>
             </div>
         </div>
     </div>
@@ -108,98 +129,266 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, collection, addDoc, getDocs, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, addDoc, deleteDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- 核心變數與鎖定 ---
-        const appId = "default-app-id"; // 您要求的關鍵鎖定 
+        // 鎖定 App ID 為使用者指定的 ID
+        const appId = "default-app-id";
         const firebaseConfig = {
             apiKey: "AIzaSyAXnSDK_kY4Aa8XvL0M_Md9kA4Wdow_Uvs",
             authDomain: "daily-23c82.firebaseapp.com",
             projectId: "daily-23c82",
             storageBucket: "daily-23c82.firebasestorage.app",
             messagingSenderId: "574719251457",
-            appId: "1:574719251457:web:30aadb364406783b175c00",
-            measurementId: "G-6JN0N6BJHH"
-        }; [cite: 35]
+            appId: "1:574719251457:web:30aadb364406783b175c00"
+        };
 
         const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
         const auth = getAuth(app);
+        const db = getFirestore(app);
 
-        let dataUserId = localStorage.getItem('custom_user_id'); [cite: 75]
-        let dailyLogs = [];
+        let uid = localStorage.getItem('war_room_uid') || null;
+        let tasks = [];
+        let logs = [];
+        let monthlyStatus = {};
+        let openCats = new Set(['一般', 'ERP', '業務']); // 預設展開部分常用分類
+        let chart = null;
 
-        // --- 資料庫路徑定義 (已整合 appId) ---
-        const getDailyLogCollectionRef = () => {
-            const today = new Date().toISOString().split('T')[0];
-            return collection(db, 'artifacts', appId, 'users', dataUserId, 'daily_logs', today, 'entries');
-        }; [cite: 73, 74]
-
-        const getRoutineTasksDocRef = () => doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'routine_tasks'); [cite: 70, 71]
-
-        // --- 初始化系統 ---
-        onAuthStateChanged(auth, (user) => {
+        // 初始化與認證
+        onAuthStateChanged(auth, async (user) => {
             if (user) {
-                if (!dataUserId) dataUserId = user.uid; [cite: 38]
-                document.getElementById('loading-overlay').style.display = 'none';
-                document.getElementById('app-container').style.display = 'block';
-                document.getElementById('app-id-display').textContent = appId;
-                document.getElementById('user-id-display').textContent = dataUserId;
+                if (!uid) {
+                    uid = user.uid;
+                    localStorage.setItem('war_room_uid', uid);
+                }
+                document.getElementById('display-uid').textContent = uid;
+                
+                // 隱藏 Loading 並顯示主程式
+                document.getElementById('loading-overlay').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('loading-overlay').style.display = 'none';
+                    document.getElementById('app-main').style.display = 'block';
+                }, 300);
+
                 initApp();
             } else {
-                signInAnonymously(auth); [cite: 31]
+                signInAnonymously(auth).catch(err => console.error("Firebase Auth Error:", err));
             }
         });
 
-        window.applyCustomUserId = () => {
-            const input = document.getElementById('custom-user-id-input').value.trim();
-            if (input) {
-                localStorage.setItem('custom_user_id', input); [cite: 78]
-                location.reload();
+        function initApp() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('current-date-display').textContent = today.replace(/-/g, ' / ');
+
+            // 1. 監聽任務配置
+            onSnapshot(doc(db, 'artifacts', appId, 'users', uid, 'config', 'routine_tasks'), d => {
+                tasks = d.exists() ? d.data().tasks : [];
+                renderTasks();
+            }, err => console.error("Task Config Error:", err));
+
+            // 2. 監聽每月狀態
+            onSnapshot(doc(db, 'artifacts', appId, 'users', uid, 'config', 'monthly_status'), d => {
+                monthlyStatus = d.exists() ? d.data().status : {};
+                renderTasks();
+            }, err => console.error("Monthly Status Error:", err));
+
+            // 3. 監聽今日日誌
+            const logsQuery = query(collection(db, 'artifacts', appId, 'users', uid, 'logs'), where('date', '==', today));
+            onSnapshot(logsQuery, snap => {
+                logs = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                renderTimeline();
+                renderTasks();
+                updateChart();
+            }, err => console.error("Logs Snapshot Error:", err));
+        }
+
+        // 渲染任務清單
+        function renderTasks() {
+            const container = document.getElementById('task-list-container');
+            if (!container) return;
+
+            const grouped = tasks.reduce((acc, t) => {
+                const c = t.category || '未分類';
+                if (!acc[c]) acc[c] = [];
+                acc[c].push(t);
+                return acc;
+            }, {});
+
+            const doneSet = new Set(logs.filter(l => l.type === 'Routine').map(l => l.taskKey));
+
+            container.innerHTML = Object.keys(grouped).sort().map(cat => {
+                const isOpen = openCats.has(cat);
+                return `
+                    <div class="border border-slate-700 rounded-lg overflow-hidden">
+                        <div onclick="window.toggleCat('${cat}')" class="bg-slate-800 p-2 px-4 flex justify-between items-center cursor-pointer hover:bg-slate-700">
+                            <span class="text-sm font-bold text-slate-300">📁 ${cat}</span>
+                            <span class="text-xs transition-transform ${isOpen?'rotate-180':''} ">▼</span>
+                        </div>
+                        <div class="${isOpen?'':'hidden'} p-2 space-y-1 bg-slate-900/50">
+                            ${grouped[cat].map(t => {
+                                const isDaily = t.type === 'Daily';
+                                const status = isDaily ? doneSet.has(t.name) : !!monthlyStatus[t.name];
+                                const typeTag = isDaily ? 
+                                    `<span class="text-[9px] px-1 bg-blue-900 text-blue-300 mr-2 rounded">每日</span>` : 
+                                    `<span class="text-[9px] px-1 bg-emerald-900 text-emerald-300 mr-2 rounded">每月</span>`;
+                                
+                                return `
+                                    <div class="flex items-center justify-between p-2 rounded hover:bg-slate-800 group">
+                                        <div onclick="${status?'':`window.completeTask('${t.name.replace(/'/g,"\\'")}', '${t.type}')`}" class="flex-1 cursor-pointer flex items-center">
+                                            ${typeTag}
+                                            <span class="${status?'line-through':''} text-sm">
+                                                ${t.name} ${status && !isDaily ? `<span class="text-[10px] opacity-60">(${monthlyStatus[t.name]})</span>` : ''}
+                                            </span>
+                                        </div>
+                                        <button onclick="window.deleteTaskDef('${t.name.replace(/'/g,"\\'")}')" class="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-400">×</button>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 完成任務
+        window.completeTask = async (name, type) => {
+            const now = new Date();
+            const time = now.toLocaleTimeString('zh-TW', {hour12:false, hour:'2-digit', minute:'2-digit'});
+            const dateStr = now.toISOString().split('T')[0];
+            const dateSuffix = `(${now.getMonth()+1}/${now.getDate()})`;
+
+            try {
+                // 新增日誌紀錄
+                await addDoc(collection(db, 'artifacts', appId, 'users', uid, 'logs'), {
+                    taskName: type === 'Monthly' ? `${name} ${dateSuffix}` : name,
+                    taskKey: name,
+                    type: 'Routine',
+                    date: dateStr,
+                    time: time,
+                    timestamp: Date.now()
+                });
+
+                // 如果是每月任務，更新配置狀態
+                if (type === 'Monthly') {
+                    const newStatus = {...monthlyStatus, [name]: `${now.getMonth()+1}/${now.getDate()}`};
+                    await setDoc(doc(db, 'artifacts', appId, 'users', uid, 'config', 'monthly_status'), {status: newStatus});
+                }
+            } catch (e) {
+                console.error("Save Error:", e);
             }
         };
 
-        window.showUserSettingsModal = () => {
-            document.getElementById('modal-current-user-id').textContent = dataUserId;
-            document.getElementById('user-settings-modal').classList.remove('hidden');
+        window.toggleCat = (c) => {
+            if (openCats.has(c)) openCats.delete(c); else openCats.add(c);
+            renderTasks();
         };
 
-        window.closeUserSettingsModal = () => {
-            document.getElementById('user-settings-modal').classList.add('hidden');
-        };
-
-        // 簡單的時間軸載入邏輯
-        function initApp() {
-            const today = new Date();
-            document.getElementById('header-date').textContent = today.toLocaleDateString();
-
-            // 監聽今日日誌 [cite: 41, 74]
-            onSnapshot(getDailyLogCollectionRef(), (snapshot) => {
-                const timeline = document.getElementById('daily-log-timeline');
-                timeline.innerHTML = '';
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    const item = document.createElement('div');
-                    item.className = "p-3 bg-slate-700/50 rounded border-l-2 border-indigo-400";
-                    item.innerHTML = `<span class="text-xs text-gray-400 font-mono">${data.time || ''}</span><p class="text-sm">${data.task}</p>`;
-                    timeline.appendChild(item);
-                });
-            });
-        }
-
-        window.logAdHocTask = async () => {
-            const input = document.getElementById('adhoc-task-description');
-            if (!input.value) return;
+        window.renderTimeline = () => {
+            const container = document.getElementById('timeline-container');
+            const sorted = [...logs].sort((a,b) => b.timestamp - a.timestamp);
+            document.getElementById('log-count').textContent = `${logs.length} 筆`;
             
-            await addDoc(getDailyLogCollectionRef(), {
-                task: input.value,
+            container.innerHTML = sorted.map(l => `
+                <div class="timeline-item">
+                    <div class="timeline-dot"></div>
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="text-[10px] font-mono text-cyan-500">${l.time}</span>
+                            <p class="text-sm font-medium">${l.taskName}</p>
+                        </div>
+                        <button onclick="window.delLog('${l.id}', '${l.taskKey || ''}')" class="text-slate-600 hover:text-red-400">×</button>
+                    </div>
+                </div>
+            `).join('');
+        };
+
+        window.delLog = async (id, taskKey) => {
+            if (!confirm("確定刪除此紀錄？")) return;
+            await deleteDoc(doc(db, 'artifacts', appId, 'users', uid, 'logs', id));
+            if (taskKey && monthlyStatus[taskKey]) {
+                const newStatus = {...monthlyStatus};
+                delete newStatus[taskKey];
+                await setDoc(doc(db, 'artifacts', appId, 'users', uid, 'config', 'monthly_status'), {status: newStatus});
+            }
+        };
+
+        window.saveNewTask = async () => {
+            const name = document.getElementById('new-name').value.trim();
+            const cat = document.getElementById('new-cat').value.trim() || '一般';
+            const type = document.getElementById('new-type').value;
+            if (!name) return;
+            
+            const newTasks = [...tasks, {name, category: cat, type}];
+            await setDoc(doc(db, 'artifacts', appId, 'users', uid, 'config', 'routine_tasks'), {tasks: newTasks});
+            document.getElementById('new-name').value = '';
+            document.getElementById('new-task-form').classList.add('hidden');
+        };
+
+        window.deleteTaskDef = async (name) => {
+            if (!confirm(`確定刪除任務「${name}」？這不會刪除過去日誌。`)) return;
+            const newTasks = tasks.filter(t => t.name !== name);
+            await setDoc(doc(db, 'artifacts', appId, 'users', uid, 'config', 'routine_tasks'), {tasks: newTasks});
+        };
+
+        window.submitAdhoc = async () => {
+            const input = document.getElementById('adhoc-input');
+            const cat = document.getElementById('adhoc-cat').value;
+            if (!input.value.trim()) return;
+            
+            await addDoc(collection(db, 'artifacts', appId, 'users', uid, 'logs'), {
+                taskName: `[${cat}] ${input.value}`,
                 type: 'Ad-hoc',
-                time: new Date().toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit' }),
-                timestamp: serverTimestamp()
-            }); [cite: 32]
+                date: new Date().toISOString().split('T')[0],
+                time: new Date().toLocaleTimeString('zh-TW', {hour12:false, hour:'2-digit', minute:'2-digit'}),
+                timestamp: Date.now()
+            });
             input.value = '';
         };
 
+        // UI 互動
+        window.toggleNewTaskForm = () => document.getElementById('new-task-form').classList.toggle('hidden');
+        window.openUserModal = () => {
+            document.getElementById('current-id-box').textContent = uid;
+            document.getElementById('user-modal').classList.remove('hidden');
+        };
+        window.closeUserModal = () => document.getElementById('user-modal').classList.add('hidden');
+        window.applyId = () => {
+            const val = document.getElementById('id-input').value.trim();
+            if (val) {
+                localStorage.setItem('war_room_uid', val);
+                location.reload();
+            }
+        };
+        window.forceStart = () => {
+            document.getElementById('loading-overlay').style.display = 'none';
+            document.getElementById('app-main').style.display = 'block';
+        };
+
+        function updateChart() {
+            const r = logs.filter(l => l.type === 'Routine').length;
+            const a = logs.filter(l => l.type === 'Ad-hoc').length;
+            document.getElementById('stat-total').textContent = `${r+a} 項目`;
+            
+            if (!chart) {
+                const ctx = document.getElementById('workChart').getContext('2d');
+                chart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['例行項目', '臨時事項'],
+                        datasets: [{ data: [r, a], backgroundColor: ['#06b6d4', '#ef4444'], borderWidth: 0 }]
+                    },
+                    options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '80%' }
+                });
+            } else {
+                chart.data.datasets[0].data = [r, a];
+                chart.update();
+            }
+        }
+        
+        window.resetMonthly = async () => {
+            if (confirm("確定重置本月所有任務狀態？")) {
+                await setDoc(doc(db, 'artifacts', appId, 'users', uid, 'config', 'monthly_status'), {status: {}});
+            }
+        };
     </script>
 </body>
 </html>
