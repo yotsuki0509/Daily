@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>每日工作日誌 - 戰情室</title>
+    <title>每日工作日誌 - 戰情室 (含每月任務)</title>
     <!-- 載入 Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 載入 Chart.js 用於圖表呈現 -->
@@ -191,7 +191,7 @@
                 <div class="card p-6 no-print">
                     <h2 class="text-xl font-bold text-cyan-400 mb-4 flex items-center border-b border-slate-700 pb-2">
                         <svg class="w-6 h-6 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
-                        [ROUTINE CENTER] 例行任務清單
+                        [ROUTINE CENTER] 每日例行任務
                     </h2>
                     
                     <!-- 任務列表 -->
@@ -219,6 +219,34 @@
                             <input type="text" id="new-routine-task-notes" placeholder="備註 (選填, e.g., 24550收料單明細表)" class="w-full text-sm p-2 border border-slate-600 bg-slate-900 rounded focus:ring-cyan-500 focus:border-cyan-500 outline-none text-gray-100 placeholder-gray-500">
                             <button onclick="addRoutineTask()" class="w-full bg-cyan-500 text-slate-900 text-sm font-bold py-1.5 rounded hover:bg-cyan-400 transition duration-150">儲存任務</button>
                         </div>
+                    </div>
+                </div>
+
+                <!-- [NEW] 每月/長期任務專區 -->
+                <div class="card p-6 no-print">
+                    <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
+                        <h2 class="text-xl font-bold text-emerald-400 flex items-center">
+                            <svg class="w-6 h-6 mr-2 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                            [MONTHLY MISSION] 每月/長期任務
+                        </h2>
+                        <button onclick="resetMonthlyStatus()" class="text-xs bg-slate-700 text-gray-400 hover:text-white hover:bg-red-600 px-3 py-1 rounded transition-colors" title="新月份開始時點擊重置所有進度">
+                            重置進度
+                        </button>
+                    </div>
+                    
+                    <p class="text-xs text-gray-500 mb-4">此區任務完成後<span class="text-emerald-400 font-bold">不會</span>在隔天自動重置，適合紀錄月結、週報等非每日事項。</p>
+
+                    <!-- 每月任務列表 -->
+                    <div id="monthly-tasks-list" class="space-y-2 mb-4">
+                        <div class="text-center py-4 text-gray-500 text-sm bg-slate-700 rounded-lg border border-dashed border-slate-600">
+                            尚無每月任務
+                        </div>
+                    </div>
+
+                    <!-- 新增每月任務輸入框 -->
+                    <div class="flex space-x-2">
+                        <input type="text" id="new-monthly-task-name" placeholder="輸入每月任務名稱 (e.g. 製作月結報表)" class="flex-1 text-sm p-2 border border-slate-600 bg-slate-900 rounded focus:ring-emerald-500 focus:border-emerald-500 outline-none text-gray-100 placeholder-gray-500">
+                        <button onclick="addMonthlyTask()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold px-4 rounded transition duration-150">新增</button>
                     </div>
                 </div>
 
@@ -380,12 +408,19 @@
 
         let routineTasks = []; 
         let completedRoutineTaskNames = new Set(); 
+        
+        // --- 新增：每月任務相關變數 ---
+        let monthlyTasks = []; // 儲存每月任務列表
+        let monthlyTaskStatus = {}; // 儲存每月任務完成狀態 { taskName: boolean/timestamp }
+        
         let dailyLogs = [];
         let statsChart = null;
         
         // 監聽器取消函數 (用於切換用戶時取消舊的監聽)
         let unsubscribeRoutine = null;
         let unsubscribeLogs = null;
+        let unsubscribeMonthly = null;
+        let unsubscribeMonthlyStatus = null;
         
         let openCategories = new Set(); 
         
@@ -440,7 +475,7 @@
             let adhocCount = 0;
 
             dailyLogs.forEach(log => {
-                if (log.type === 'Routine') routineCount++;
+                if (log.type === 'Routine' || log.type === 'Monthly') routineCount++; // 將 Monthly 視為 Routine 統計
                 else adhocCount++;
             });
 
@@ -543,6 +578,11 @@
 
         // Firestore 路徑定義 - 關鍵修改：使用 dataUserId 而非 authUserId
         const getRoutineTasksDocRef = () => dataUserId ? doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'routine_tasks') : null;
+        
+        // [NEW] 每月任務的路徑
+        const getMonthlyTasksDocRef = () => dataUserId ? doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'monthly_tasks') : null;
+        const getMonthlyStatusDocRef = () => dataUserId ? doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'monthly_status') : null;
+
         const getDailyLogCollectionRef = (dateString = getTodayDateString()) => dataUserId ? collection(db, 'artifacts', appId, 'users', dataUserId, 'daily_logs', dateString, 'entries') : null;
 
         // --- User ID Management ---
@@ -629,6 +669,7 @@
                         
                         initChart(); 
                         loadRoutineTasks();
+                        loadMonthlyTasks(); // [NEW] 載入每月任務
                         subscribeToDailyLogs();
                         
                         // UI Transition
@@ -640,7 +681,6 @@
                         
                         // 如果是第一次匿名登入且沒有設定自訂 ID，提示用戶
                         if (dataUserId === authUserId && !localStorage.getItem('seen_user_tip')) {
-                             // 這裡可以選擇性彈出提示，暫時不彈以免干擾
                              localStorage.setItem('seen_user_tip', 'true');
                         }
 
@@ -674,12 +714,40 @@
                 renderRoutineTasks(); 
             }, (error) => {
                 console.error("Error loading routine tasks:", error);
-                // 權限錯誤通常是因為自訂 ID 設定錯誤或 Firebase 規則限制
                 if (error.code === 'permission-denied') {
                      showMessage('error', '權限錯誤', '無法讀取資料。請確認您使用的自訂 ID 正確，或嘗試重置 ID。');
                 }
             });
         };
+        
+        // [NEW] 載入每月任務與其狀態
+        const loadMonthlyTasks = () => {
+            if (!isAuthReady || !dataUserId) return;
+
+            if (unsubscribeMonthly) unsubscribeMonthly();
+            if (unsubscribeMonthlyStatus) unsubscribeMonthlyStatus();
+
+            // 1. 監聽任務列表
+            unsubscribeMonthly = onSnapshot(getMonthlyTasksDocRef(), (docSnap) => {
+                if (docSnap.exists() && Array.isArray(docSnap.data().tasks)) {
+                    monthlyTasks = docSnap.data().tasks;
+                } else {
+                    monthlyTasks = [];
+                }
+                renderMonthlyTasks();
+            });
+
+            // 2. 監聽完成狀態 (獨立於每日 Log)
+            unsubscribeMonthlyStatus = onSnapshot(getMonthlyStatusDocRef(), (docSnap) => {
+                if (docSnap.exists()) {
+                    monthlyTaskStatus = docSnap.data();
+                } else {
+                    monthlyTaskStatus = {};
+                }
+                renderMonthlyTasks();
+            });
+        };
+
 
         const saveRoutineTasks = async (tasks) => {
             if (!isAuthReady || !dataUserId) {
@@ -692,6 +760,44 @@
                 console.error("Save Routine Task Error:", e);
                 showMessage('error', '儲存失敗', `無法更新例行任務清單。錯誤: ${e.message}`);
             }
+        };
+        
+        // [NEW] 儲存每月任務
+        const saveMonthlyTasks = async (tasks) => {
+             if (!isAuthReady || !dataUserId) return;
+             try {
+                 await setDoc(getMonthlyTasksDocRef(), { tasks });
+             } catch(e) {
+                 showMessage('error', '儲存失敗', `無法更新每月任務清單。錯誤: ${e.message}`);
+             }
+        };
+
+        // [NEW] 更新每月任務狀態
+        const updateMonthlyTaskStatus = async (taskName, isCompleted) => {
+             if (!isAuthReady || !dataUserId) return;
+             try {
+                 const newStatus = { ...monthlyTaskStatus };
+                 if (isCompleted) {
+                     newStatus[taskName] = Date.now(); // 紀錄完成時間戳
+                 } else {
+                     delete newStatus[taskName]; // 移除代表未完成
+                 }
+                 await setDoc(getMonthlyStatusDocRef(), newStatus);
+             } catch(e) {
+                 console.error(e);
+             }
+        };
+        
+        // [NEW] 重置每月任務狀態
+        window.resetMonthlyStatus = () => {
+             showMessage('confirm', '重置確認', '確定要將所有「每月/長期任務」重置為未完成狀態嗎？(通常於月初執行)', async () => {
+                 try {
+                     await setDoc(getMonthlyStatusDocRef(), {});
+                     showMessage('success', '重置完成', '所有每月任務已重置。');
+                 } catch(e) {
+                     showMessage('error', '錯誤', e.message);
+                 }
+             });
         };
 
         window.addRoutineTask = async () => {
@@ -708,6 +814,28 @@
             document.getElementById('new-routine-task-category').value = '';
             document.getElementById('new-routine-task-name').value = '';
             document.getElementById('new-routine-task-notes').value = '';
+        };
+        
+        // [NEW] 新增每月任務
+        window.addMonthlyTask = async () => {
+             const nameInput = document.getElementById('new-monthly-task-name');
+             const name = nameInput.value.trim();
+             if(!name) return showMessage('error', '錯誤', '請輸入任務名稱');
+             
+             if (monthlyTasks.includes(name)) return showMessage('error', '重複', '此任務已存在');
+             
+             await saveMonthlyTasks([...monthlyTasks, name]);
+             nameInput.value = '';
+        };
+        
+        // [NEW] 刪除每月任務
+        window.deleteMonthlyTask = (name) => {
+             showMessage('confirm', '刪除任務', `確定要刪除每月任務「${name}」嗎？`, async () => {
+                  const newTasks = monthlyTasks.filter(t => t !== name);
+                  await saveMonthlyTasks(newTasks);
+                  // 同步清除狀態
+                  updateMonthlyTaskStatus(name, false);
+             });
         };
 
         window.deleteRoutineTaskByName = (taskName) => {
@@ -880,6 +1008,64 @@
         };
 
         // --- UI Rendering ---
+        
+        // [NEW] 渲染每月任務
+        const renderMonthlyTasks = () => {
+             const list = document.getElementById('monthly-tasks-list');
+             list.innerHTML = '';
+             
+             if (monthlyTasks.length === 0) {
+                 list.innerHTML = `<div class="text-center py-4 text-gray-500 text-sm bg-slate-700 rounded-lg border border-dashed border-slate-600">尚無每月任務</div>`;
+                 return;
+             }
+             
+             monthlyTasks.forEach(taskName => {
+                 const isDone = !!monthlyTaskStatus[taskName];
+                 
+                 const taskEl = document.createElement('div');
+                 taskEl.className = `flex items-center justify-between p-3 rounded-lg border-2 transition-all duration-200 ${isDone 
+                        ? 'border-emerald-600 bg-emerald-900/20 opacity-80' 
+                        : 'border-slate-700 hover:border-emerald-500 bg-slate-700/50'}`;
+                 
+                 taskEl.innerHTML = `
+                    <div class="flex items-center space-x-3 flex-1 overflow-hidden">
+                        <div class="relative flex items-center shrink-0">
+                            <input type="checkbox" id="monthly-${taskName}" class="peer h-6 w-6 cursor-pointer appearance-none rounded-md border-2 border-slate-500 shadow-sm checked:bg-emerald-500 checked:border-emerald-500 bg-slate-900 transition-colors duration-200" ${isDone ? 'checked' : ''}>
+                            <svg class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none opacity-0 peer-checked:opacity-100 text-slate-900 transition-opacity duration-200" viewBox="0 0 14 10" fill="none"><path d="M1 5L4.5 8.5L13 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </div>
+                        <label for="monthly-${taskName}" class="truncate text-base font-medium ${isDone ? 'text-gray-400 line-through' : 'text-gray-100'} cursor-pointer select-none">
+                            ${taskName}
+                        </label>
+                    </div>
+                    <button onclick="deleteMonthlyTask('${taskName}')" class="text-gray-600 hover:text-red-500 ml-4 p-1 shrink-0 no-print">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                 `;
+                 
+                 // 每月任務 Checkbox 邏輯: 點擊切換狀態 + 寫 Log (如果是勾選)
+                 taskEl.querySelector('input').addEventListener('change', async (e) => {
+                     const isChecked = e.target.checked;
+                     e.target.disabled = true; // 防止連點
+                     
+                     try {
+                         // 1. 更新永久狀態
+                         await updateMonthlyTaskStatus(taskName, isChecked);
+                         // 2. 如果是勾選，幫忙寫入今日 Log (讓老闆知道今天做了這件事)
+                         if (isChecked) {
+                             await window.addLogEntry('Monthly', `[每月任務] 完成: ${taskName}`, null, '月度任務');
+                         }
+                     } catch(err) {
+                         console.error(err);
+                         e.target.checked = !isChecked; // Revert
+                     } finally {
+                         e.target.disabled = false;
+                     }
+                 });
+                 
+                 list.appendChild(taskEl);
+             });
+        };
+
         const renderRoutineTasks = () => {
             const list = document.getElementById('routine-tasks-list');
             list.innerHTML = '';
@@ -983,13 +1169,17 @@
             }
 
             logs.forEach(log => {
-                const isRoutine = log.type === 'Routine';
-                const icon = isRoutine 
-                    ? `<svg class="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>`
-                    : `<svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+                const isRoutine = log.type === 'Routine' || log.type === 'Monthly';
+                // [NEW] 如果是 Monthly 使用綠色 Icon
+                const isMonthly = log.type === 'Monthly';
                 
-                const dotClass = isRoutine ? 'bg-blue-500 border-blue-700' : 'bg-red-500 border-red-700';
-
+                let iconColor = isMonthly ? 'text-emerald-400' : (isRoutine ? 'text-blue-400' : 'text-red-400');
+                let dotClass = isMonthly ? 'bg-emerald-500 border-emerald-700' : (isRoutine ? 'bg-blue-500 border-blue-700' : 'bg-red-500 border-red-700');
+                
+                const icon = isRoutine 
+                    ? `<svg class="w-4 h-4 ${iconColor}" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>`
+                    : `<svg class="w-4 h-4 ${iconColor}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+                
                 const logItem = document.createElement('div');
                 logItem.className = 'timeline-item';
                 logItem.innerHTML = `
@@ -1061,11 +1251,16 @@
             const printModal = document.getElementById('print-modal');
             const printContent = document.getElementById('print-content');
             
+            // 複製 Routine Center 和 Monthly Center
+            const routineBlock = document.querySelector('.lg\\:col-span-8 > .card:nth-child(1)').cloneNode(true);
+            const monthlyBlock = document.querySelector('.lg\\:col-span-8 > .card:nth-child(2)').cloneNode(true);
             const logBlock = document.querySelector('.lg\\:col-span-8 > .card:last-child').cloneNode(true);
 
-            [logBlock].forEach(block => {
+            [routineBlock, monthlyBlock, logBlock].forEach(block => {
                 block.querySelectorAll('.no-print').forEach(el => el.remove());
                 block.querySelectorAll('button').forEach(el => el.remove());
+                // 移除輸入框
+                block.querySelectorAll('input[type="text"]').forEach(el => el.parentElement.remove());
             });
 
             logBlock.querySelector('#log-count-badge')?.remove();
@@ -1084,6 +1279,8 @@
             `;
 
             printContent.innerHTML = headerHTML;
+            printContent.appendChild(routineBlock);
+            printContent.appendChild(monthlyBlock);
             printContent.appendChild(logBlock);
             
             printModal.classList.remove('hidden');
