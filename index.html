@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>每日工作日誌 - 戰情室 (任務整合版)</title>
+    <title>每日工作日誌 - 戰情室 (已修復版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -16,191 +16,103 @@
             background-color: #1e293b;
             border: 1px solid #334155;
             border-radius: 0.75rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
             transition: all 0.3s ease;
         }
-        .card:hover {
-            border-color: #06b6d4;
-            box-shadow: 0 0 15px rgba(6, 182, 212, 0.4);
-        }
-        .timeline-item {
-            position: relative;
-            padding-left: 2.5rem;
-            padding-bottom: 1.5rem;
-            border-left: 2px solid #334155;
-        }
-        .timeline-item:last-child { border-left: 2px solid transparent; }
-        .timeline-dot {
-            position: absolute;
-            left: -10px;
-            top: 0;
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            background-color: #0f172a;
-            border: 2px solid #334155;
-            box-shadow: 0 0 0 3px #1e293b;
-        }
+        .card:hover { border-color: #06b6d4; }
         .loading-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: #0f172a;
-            display: flex; justify-content: center; align-items: center;
-            z-index: 1000;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #0f172a; display: flex; justify-content: center; align-items: center; z-index: 1000;
         }
         .modal-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.75);
-            display: flex; justify-content: center; align-items: center;
-            z-index: 100;
-        }
-        .modal-content {
-            background-color: #1e293b;
-            color: #e2e8f0;
-            max-width: 90%;
-            max-height: 90vh;
-            overflow-y: auto;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.75); display: flex; justify-content: center; align-items: center; z-index: 100;
         }
         @media print { .no-print { display: none !important; } }
     </style>
 </head>
-<body class="text-gray-100">
+<body>
     <div id="loading-overlay" class="loading-overlay">
         <div class="text-center">
-            <svg class="animate-spin mx-auto h-10 w-10 text-cyan-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <svg class="animate-spin h-10 w-10 text-cyan-400 mb-4 mx-auto" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <p class="text-gray-400 font-medium">個人戰情室系統載入中...</p>
+            <p>正在連線至資料庫...</p>
         </div>
     </div>
 
     <div class="container mx-auto p-4 max-w-7xl" id="app-container" style="display: none;">
         <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 bg-slate-800 p-6 rounded-xl card border-cyan-400 border-l-4">
             <div>
-                <h1 class="text-3xl font-extrabold tracking-widest text-cyan-400">工作日誌 Crafted by 勝全 · Powered by AI</h1>
-                <p class="text-gray-400 mt-1 flex items-center text-sm">
-                    <svg class="w-4 h-4 mr-1 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                    <span id="header-date" class="font-mono"></span>
-                </p>
+                <h1 class="text-2xl font-bold text-cyan-400">工作日誌   - Crafted by 勝全   Powered by AI</h1>
+                <p class="text-sm text-gray-400" id="header-date"></p>
             </div>
-            <div class="mt-4 md:mt-0 flex space-x-3 no-print">
-                <button onclick="togglePrintView()" class="bg-slate-700 hover:bg-slate-600 text-gray-200 py-2 px-4 rounded-lg text-sm">預覽/列印</button>
-                <button onclick="showHistoryModal()" class="bg-indigo-500 hover:bg-indigo-600 text-white py-2 px-4 rounded-lg text-sm">歷史紀錄</button>
-                <button onclick="showUserSettingsModal()" class="bg-cyan-600 hover:bg-cyan-500 text-white py-2 px-4 rounded-lg text-sm">帳號切換</button>
+            <div class="flex space-x-2 no-print">
+                <button onclick="showHistoryModal()" class="bg-indigo-600 px-4 py-2 rounded-lg text-sm">歷史紀錄</button>
+                <button onclick="showUserSettingsModal()" class="bg-cyan-600 px-4 py-2 rounded-lg text-sm">帳號切換</button>
             </div>
         </header>
-        
+
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <div class="lg:col-span-4 space-y-6">
                 <div class="card p-6">
-                    <h2 class="text-lg font-bold text-cyan-400 mb-4 border-b border-slate-700 pb-2">[ANALYSIS] 統計</h2>
-                    <div class="relative h-48"><canvas id="workChart"></canvas></div>
-                    <div class="grid grid-cols-2 gap-4 mt-4 text-center border-t border-slate-700 pt-4">
-                        <div class="p-3 bg-slate-700 rounded-lg">
-                            <span class="block text-2xl font-extrabold text-blue-400" id="stat-routine">0</span>
-                            <span class="text-xs text-gray-400">任務項目 (Task)</span>
-                        </div>
-                        <div class="p-3 bg-slate-700 rounded-lg">
-                            <span class="block text-2xl font-extrabold text-red-400" id="stat-adhoc">0</span>
-                            <span class="text-xs text-gray-400">臨時狀況 (Ad-hoc)</span>
-                        </div>
+                    <h2 class="text-cyan-400 font-bold mb-4">工作比例分析</h2>
+                    <div class="h-48 relative">
+                        <canvas id="workChart"></canvas>
+                        <div id="chart-placeholder" class="absolute inset-0 flex items-center justify-center text-gray-500 text-sm hidden">尚無資料</div>
                     </div>
                 </div>
-
                 <div class="card p-6 no-print">
-                    <h2 class="text-lg font-bold text-cyan-400 mb-3 border-b border-slate-700 pb-2">[QUICK CAPTURE] 臨時事項</h2>
-                    <div class="flex flex-col gap-3">
-                        <select id="adhoc-category" class="w-full p-2.5 border border-slate-700 bg-slate-900 rounded-lg text-sm text-gray-100">
-                            <option value="一般">📌 一般事項</option>
-                            <option value="會議">🗣️ 會議溝通</option>
-                            <option value="維修">🔧 維修/除錯</option>
-                            <option value="開發">💻 專案開發</option>
-                            <option value="支援">🤝 支援協助</option>
-                            <option value="行政">📄 行政處理</option>
-                        </select>
-                        <input type="text" id="adhoc-task-description" placeholder="發生了什麼事？" class="w-full p-2.5 border border-slate-700 bg-slate-900 rounded-lg text-sm">
-                        <button onclick="logAdHocTask()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 rounded-lg text-sm">紀錄 (Log Entry)</button>
-                    </div>
+                    <h2 class="text-red-400 font-bold mb-3">臨時事項紀錄</h2>
+                    <input type="text" id="adhoc-task-description" placeholder="發生了什麼事？" class="w-full p-2 bg-slate-900 border border-slate-700 rounded mb-3 text-sm">
+                    <button onclick="logAdHocTask()" class="w-full bg-red-500 py-2 rounded font-bold text-sm">送出紀錄</button>
                 </div>
             </div>
 
             <div class="lg:col-span-8 space-y-6">
-                <div class="card p-6 no-print">
-                    <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
-                        <h2 class="text-xl font-bold text-cyan-400 flex items-center">
-                            <svg class="w-6 h-6 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
-                            [TASK CENTER] 任務管理中心
-                        </h2>
-                        <button onclick="resetMonthlyStatus()" class="text-xs bg-slate-700 text-gray-400 hover:bg-red-600 px-3 py-1 rounded transition-colors">重置每月進度</button>
-                    </div>
-                    
-                    <div id="routine-tasks-list" class="space-y-3 mb-6 max-h-[500px] overflow-y-auto pr-2">
-                        <div class="text-center py-4 text-gray-500 text-sm">載入中...</div>
-                    </div>
-                    
-                    <div class="border-t border-slate-700 pt-4">
-                        <div class="flex space-x-2 mb-3">
-                            <button onclick="document.getElementById('add-routine-form').classList.toggle('hidden')" class="flex-1 text-sm bg-slate-700 text-gray-200 hover:bg-slate-600 py-1.5 rounded-lg">新增任務</button>
-                            <button onclick="importRoutineTasks()" class="w-1/4 text-sm bg-indigo-500 text-white py-1.5 rounded-lg">匯入</button>
-                            <button onclick="exportRoutineTasks()" class="w-1/4 text-sm bg-indigo-500 text-white py-1.5 rounded-lg">匯出</button>
-                        </div>
-                        
-                        <div id="add-routine-form" class="mt-3 space-y-2 hidden bg-slate-700 p-4 rounded-lg border border-cyan-400">
-                            <select id="new-routine-task-type" class="w-full text-sm p-2 border border-slate-600 bg-slate-900 rounded text-gray-100">
-                                <option value="Daily">📅 每日任務 (每天重置)</option>
-                                <option value="Monthly">🌙 每月任務 (手動重置)</option>
-                            </select>
-                            <input type="text" id="new-routine-task-category" placeholder="類別 (如: ERP, 報表)" class="w-full text-sm p-2 bg-slate-900 rounded">
-                            <input type="text" id="new-routine-task-name" placeholder="任務名稱" class="w-full text-sm p-2 bg-slate-900 rounded">
-                            <input type="text" id="new-routine-task-notes" placeholder="備註 (選填)" class="w-full text-sm p-2 bg-slate-900 rounded">
-                            <button onclick="addRoutineTask()" class="w-full bg-cyan-500 text-slate-900 text-sm font-bold py-1.5 rounded">儲存任務</button>
-                        </div>
-                    </div>
+                <div class="card p-6">
+                    <h2 class="text-cyan-400 font-bold mb-4">每日例行任務</h2>
+                    <div id="routine-tasks-list" class="space-y-2"></div>
                 </div>
-
                 <div class="card p-6 min-h-[400px]">
-                    <h2 class="text-xl font-bold text-cyan-400 mb-6 border-b border-slate-700 pb-2 flex justify-between">
-                        <span>[DAILY LOG] 工作時間軸</span>
-                        <span class="text-xs bg-slate-700 text-gray-400 px-3 py-1 rounded-full font-mono" id="log-count-badge">0 ENTRIES</span>
-                    </h2>
-                    <div id="daily-log-timeline" class="pl-2"></div>
+                    <h2 class="text-indigo-400 font-bold mb-4">今日工作時間軸</h2>
+                    <div id="daily-log-timeline" class="space-y-4"></div>
                 </div>
             </div>
         </div>
+
+        <footer class="mt-8 text-center text-xs text-gray-600">
+            App ID: <span id="app-id-display" class="font-mono text-cyan-500"></span> | 
+            User ID: <span id="user-id-display" class="font-mono text-cyan-500"></span>
+        </footer>
     </div>
 
     <div id="user-settings-modal" class="modal-overlay hidden">
-        <div class="modal-content p-6 rounded-xl w-full max-w-md">
-            <h3 class="text-xl font-bold text-cyan-400 mb-4">用戶帳號設定</h3>
+        <div class="bg-slate-800 p-6 rounded-xl w-full max-w-md border border-slate-600">
+            <h3 class="text-xl font-bold text-cyan-400 mb-4">帳號切換</h3>
             <div class="space-y-4">
-                <div class="bg-slate-800 p-3 rounded">ID: <span id="modal-current-user-id" class="text-green-400 font-mono"></span></div>
-                <input type="text" id="custom-user-id-input" placeholder="輸入自訂 ID (如: user-123)" class="w-full p-2 bg-slate-900 border border-indigo-500 rounded">
-                <button onclick="applyCustomUserId()" class="w-full bg-indigo-600 py-2 rounded">切換/載入</button>
-                <button onclick="closeUserSettingsModal()" class="w-full text-gray-400 text-sm">取消</button>
+                <div class="bg-slate-900 p-3 rounded">
+                    <p class="text-xs text-gray-500">目前 ID</p>
+                    <p id="modal-current-user-id" class="font-mono text-green-400 font-bold"></p>
+                </div>
+                <input type="text" id="custom-user-id-input" placeholder="輸入您的自訂名稱" class="w-full p-3 bg-slate-900 border border-indigo-500 rounded text-white">
+                <div class="flex space-x-2">
+                    <button onclick="applyCustomUserId()" class="flex-1 bg-indigo-600 py-2 rounded font-bold">確認切換</button>
+                    <button onclick="closeUserSettingsModal()" class="px-4 py-2 bg-slate-700 rounded">取消</button>
+                </div>
             </div>
         </div>
     </div>
-    
-    <div id="history-modal" class="modal-overlay hidden">
-        <div class="modal-content p-6 rounded-xl w-full max-w-4xl flex flex-col h-[80vh]">
-            <div class="flex justify-between mb-4"><h2 class="text-xl font-bold">歷史紀錄</h2><button onclick="closeHistoryModal()">×</button></div>
-            <input type="date" id="history-date-picker" onchange="fetchLogsForDate(this.value)" class="p-2 bg-slate-900 rounded mb-4">
-            <div id="history-log-entries" class="flex-1 overflow-y-auto"></div>
-        </div>
-    </div>
-
-    <div id="print-modal" class="modal-overlay hidden"><div class="modal-content bg-white text-gray-900 p-8 rounded shadow-2xl w-full max-w-3xl" id="print-content"></div></div>
-    <div id="message-modal" class="modal-overlay hidden"><div class="modal-content p-6 rounded-xl w-full max-w-sm text-center"><div id="modal-icon"></div><h3 id="message-modal-title" class="font-bold my-2 text-xl"></h3><p id="message-modal-body" class="text-gray-400 mb-4"></p><div id="message-modal-actions"></div></div></div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, collection, query, where, addDoc, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, addDoc, getDocs, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firebase 嚴格配置
-        const LOCAL_FIREBASE_CONFIG = {
+        // --- 核心變數與鎖定 ---
+        const appId = "default-app-id"; // 您要求的關鍵鎖定 
+        const firebaseConfig = {
             apiKey: "AIzaSyAXnSDK_kY4Aa8XvL0M_Md9kA4Wdow_Uvs",
             authDomain: "daily-23c82.firebaseapp.com",
             projectId: "daily-23c82",
@@ -208,325 +120,86 @@
             messagingSenderId: "574719251457",
             appId: "1:574719251457:web:30aadb364406783b175c00",
             measurementId: "G-6JN0N6BJHH"
-        };
-
-        let firebaseConfig = (typeof __firebase_config !== 'undefined' && __firebase_config !== 'null' && __firebase_config.length > 2) 
-            ? JSON.parse(__firebase_config) : LOCAL_FIREBASE_CONFIG;
+        }; [cite: 35]
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-              // --- 核心設定區 ---
-        // 將 appId 鎖定為您要求的 'default-app-id'
-        const appId = 'default-app-id'; 
-        
-        // 更新 UI 上的顯示，確保您知道目前連線的路徑
-        document.getElementById('app-id-display').textContent = appId;
-        
-        // Firestore 路徑定義邏輯 (這部分保持不變，但會引用上面的 appId)
-        const getRoutineTasksDocRef = () => dataUserId ? 
-            doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'routine_tasks') : null;
-        
-        const getMonthlyTasksDocRef = () => dataUserId ? 
-            doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'monthly_tasks') : null;
-        
-        const getDailyLogCollectionRef = (dateString = getTodayDateString()) => dataUserId ? 
-            collection(db, 'artifacts', appId, 'users', dataUserId, 'daily_logs', dateString, 'entries') : null;
 
-        let dataUserId = localStorage.getItem('customUserId') || null;
-        let routineTasks = [];
-        let completedRoutineTaskNames = new Set();
-        let monthlyTaskStatus = {};
+        let dataUserId = localStorage.getItem('custom_user_id'); [cite: 75]
         let dailyLogs = [];
-        let openCategories = new Set();
-        let statsChart = null;
 
-        // --- Core Logic ---
+        // --- 資料庫路徑定義 (已整合 appId) ---
+        const getDailyLogCollectionRef = () => {
+            const today = new Date().toISOString().split('T')[0];
+            return collection(db, 'artifacts', appId, 'users', dataUserId, 'daily_logs', today, 'entries');
+        }; [cite: 73, 74]
 
-        const initApp = () => {
-            onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    if (!dataUserId) dataUserId = user.uid;
-                    document.getElementById('loading-overlay').style.opacity = '0';
-                    setTimeout(() => {
-                        document.getElementById('loading-overlay').style.display = 'none';
-                        document.getElementById('app-container').style.display = 'block';
-                    }, 300);
-                    setupRealtimeListeners();
-                    initChart();
-                    document.getElementById('header-date').textContent = formatDisplayDate(getTodayDateString());
-                    document.getElementById('modal-current-user-id').textContent = dataUserId;
-                } else {
-                    signInAnonymously(auth);
-                }
-            });
-        };
+        const getRoutineTasksDocRef = () => doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'routine_tasks'); [cite: 70, 71]
 
-        const setupRealtimeListeners = () => {
-            const today = getTodayDateString();
-            
-            // 監聽任務配置
-            onSnapshot(doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'routine_tasks'), (doc) => {
-                routineTasks = doc.exists() ? doc.data().tasks || [] : [];
-                renderTasks();
-            });
-
-            // 監聽今日已完成項目
-            onSnapshot(query(collection(db, 'artifacts', appId, 'users', dataUserId, 'logs'), where('date', '==', today)), (snapshot) => {
-                dailyLogs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-                completedRoutineTaskNames = new Set(dailyLogs.filter(l => l.type === 'Routine').map(l => l.taskName));
-                renderTasks();
-                renderTimeline();
-                updateChart();
-            });
-
-            // 監聽每月任務狀態
-            onSnapshot(doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'monthly_status'), (doc) => {
-                monthlyTaskStatus = doc.exists() ? doc.data().status || {} : {};
-                renderTasks();
-            });
-        };
-
-        const renderTasks = () => {
-            const container = document.getElementById('routine-tasks-list');
-            if (routineTasks.length === 0) {
-                container.innerHTML = `<div class="text-center py-4 text-gray-500 bg-slate-700 rounded-lg">尚無任務</div>`;
-                return;
+        // --- 初始化系統 ---
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                if (!dataUserId) dataUserId = user.uid; [cite: 38]
+                document.getElementById('loading-overlay').style.display = 'none';
+                document.getElementById('app-container').style.display = 'block';
+                document.getElementById('app-id-display').textContent = appId;
+                document.getElementById('user-id-display').textContent = dataUserId;
+                initApp();
+            } else {
+                signInAnonymously(auth); [cite: 31]
             }
+        });
 
-            const grouped = routineTasks.reduce((acc, task) => {
-                const cat = task.category || '未分類';
-                if (!acc[cat]) acc[cat] = [];
-                acc[cat].push(task);
-                return acc;
-            }, {});
-
-            let html = '';
-            Object.keys(grouped).forEach(cat => {
-                const isOpen = openCategories.has(cat);
-                html += `
-                    <div class="border border-slate-700 rounded-lg overflow-hidden bg-slate-800/50">
-                        <button onclick="window.toggleTaskAccordion('${cat}')" class="w-full flex justify-between items-center p-3 bg-slate-800 hover:bg-slate-700 transition">
-                            <span class="font-bold text-gray-300">📁 ${cat}</span>
-                            <span class="transform transition ${isOpen ? 'rotate-180' : ''}">▼</span>
-                        </button>
-                        <div class="${isOpen ? '' : 'hidden'} p-2 space-y-2">
-                `;
-                grouped[cat].forEach(task => {
-                    const isDaily = task.type === 'Daily' || !task.type;
-                    const isDone = isDaily ? completedRoutineTaskNames.has(task.name) : !!monthlyTaskStatus[task.name];
-                    const typeLabel = isDaily ? 
-                        `<span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-900/50 text-blue-400 border border-blue-800 mr-2">每日</span>` : 
-                        `<span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-900/50 text-emerald-400 border border-emerald-800 mr-2">每月</span>`;
-
-                    html += `
-                        <div class="flex items-center justify-between p-2 bg-slate-700/30 rounded border border-transparent hover:border-slate-500 transition group">
-                            <div class="flex items-center flex-1 cursor-pointer" onclick="${isDone ? '' : `completeTask('${task.name.replace(/'/g, "\\'")}', '${isDaily ? 'Daily' : 'Monthly'}')`}">
-                                ${typeLabel}
-                                <div class="${isDone ? 'line-through text-gray-500 opacity-50' : 'text-gray-200'}">
-                                    <div class="font-medium">${task.name} ${isDone && !isDaily ? `<span class="text-xs ml-1">(${monthlyTaskStatus[task.name]})</span>` : ''}</div>
-                                    ${task.notes ? `<div class="text-xs text-gray-500">${task.notes}</div>` : ''}
-                                </div>
-                            </div>
-                            <div class="flex items-center space-x-2">
-                                ${isDone ? `<svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"></path></svg>` : 
-                                `<button onclick="completeTask('${task.name.replace(/'/g, "\\'")}', '${isDaily ? 'Daily' : 'Monthly'}')" class="text-xs bg-slate-600 hover:bg-cyan-600 px-2 py-1 rounded">完成</button>`}
-                                <button onclick="deleteTaskDefinition('${task.name.replace(/'/g, "\\'")}')" class="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 p-1">×</button>
-                            </div>
-                        </div>
-                    `;
-                });
-                html += `</div></div>`;
-            });
-            container.innerHTML = html;
-        };
-
-        window.toggleTaskAccordion = (cat) => {
-            if (openCategories.has(cat)) openCategories.delete(cat);
-            else openCategories.add(cat);
-            renderTasks();
-        };
-
-        const completeTask = async (name, type) => {
-            const time = new Date().toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit' });
-            const today = getTodayDateString();
-            const now = new Date();
-            const dateSuffix = `(${now.getMonth()+1}/${now.getDate()})`;
-            
-            // 寫入日誌
-            await addDoc(collection(db, 'artifacts', appId, 'users', dataUserId, 'logs'), {
-                taskName: type === 'Monthly' ? `${name} ${dateSuffix}` : name,
-                type: 'Routine',
-                category: routineTasks.find(t => t.name === name)?.category || '一般',
-                time: time,
-                date: today,
-                timestamp: Date.now()
-            });
-
-            // 更新每月狀態
-            if (type === 'Monthly') {
-                const newStatus = { ...monthlyTaskStatus, [name]: `${now.getMonth()+1}/${now.getDate()}` };
-                await setDoc(doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'monthly_status'), { status: newStatus });
-            }
-        };
-
-        const addRoutineTask = async () => {
-            const type = document.getElementById('new-routine-task-type').value;
-            const category = document.getElementById('new-routine-task-category').value.trim() || '一般';
-            const name = document.getElementById('new-routine-task-name').value.trim();
-            const notes = document.getElementById('new-routine-task-notes').value.trim();
-            
-            if (!name) return;
-            const newTasks = [...routineTasks, { name, category, notes, type }];
-            await setDoc(doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'routine_tasks'), { tasks: newTasks });
-            
-            document.getElementById('new-routine-task-name').value = '';
-            document.getElementById('new-routine-task-notes').value = '';
-            document.getElementById('add-routine-form').classList.add('hidden');
-        };
-
-        const deleteTaskDefinition = (name) => {
-            showMessage('confirm', '刪除任務', `確定要刪除「${name}」嗎？這不會刪除已產生的日誌。`, async () => {
-                const newTasks = routineTasks.filter(t => t.name !== name);
-                await setDoc(doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'routine_tasks'), { tasks: newTasks });
-            });
-        };
-
-        const resetMonthlyStatus = () => {
-            showMessage('confirm', '重置進度', '確定要清空所有「每月任務」的完成狀態嗎？', async () => {
-                await setDoc(doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'monthly_status'), { status: {} });
-            });
-        };
-
-        // --- 基礎工具與 UI (保留原邏輯) ---
-        window.logAdHocTask = async () => {
-            const desc = document.getElementById('adhoc-task-description').value.trim();
-            const cat = document.getElementById('adhoc-category').value;
-            if (!desc) return;
-            await addDoc(collection(db, 'artifacts', appId, 'users', dataUserId, 'logs'), {
-                taskName: desc, type: 'Ad-hoc', category: cat,
-                time: new Date().toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit' }),
-                date: getTodayDateString(), timestamp: Date.now()
-            });
-            document.getElementById('adhoc-task-description').value = '';
-        };
-
-        const renderTimeline = () => {
-            const timeline = document.getElementById('daily-log-timeline');
-            const sorted = [...dailyLogs].sort((a, b) => b.timestamp - a.timestamp);
-            if (sorted.length === 0) {
-                timeline.innerHTML = '<div class="text-center py-10 text-gray-600">今日尚未有紀錄</div>';
-                return;
-            }
-            timeline.innerHTML = sorted.map(log => `
-                <div class="timeline-item">
-                    <div class="timeline-dot"></div>
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <span class="text-xs font-mono text-cyan-400 bg-cyan-900/30 px-2 py-0.5 rounded">${log.time}</span>
-                            <span class="ml-2 text-xs text-gray-500">[${log.category}]</span>
-                            <div class="mt-1 font-medium text-gray-200">${log.taskName}</div>
-                        </div>
-                        <button onclick="deleteLog('${log.id}', '${log.taskName.split(' (')[0]}')" class="text-gray-600 hover:text-red-400 text-lg">×</button>
-                    </div>
-                </div>
-            `).join('');
-        };
-
-        window.deleteLog = async (id, originalName) => {
-            await deleteDoc(doc(db, 'artifacts', appId, 'users', dataUserId, 'logs', id));
-            // 如果刪除的是每月任務日誌，同步解除完成狀態
-            if (monthlyTaskStatus[originalName]) {
-                const newStatus = { ...monthlyTaskStatus };
-                delete newStatus[originalName];
-                await setDoc(doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'monthly_status'), { status: newStatus });
-            }
-        };
-
-        // --- 帳號、匯入/匯出與圖表功能 (保留原樣) ---
         window.applyCustomUserId = () => {
-            const id = document.getElementById('custom-user-id-input').value.trim();
-            if (id) {
-                localStorage.setItem('customUserId', id);
+            const input = document.getElementById('custom-user-id-input').value.trim();
+            if (input) {
+                localStorage.setItem('custom_user_id', input); [cite: 78]
                 location.reload();
             }
         };
-        window.showUserSettingsModal = () => document.getElementById('user-settings-modal').classList.remove('hidden');
-        window.closeUserSettingsModal = () => document.getElementById('user-settings-modal').classList.add('hidden');
-        window.showHistoryModal = () => document.getElementById('history-modal').classList.remove('hidden');
-        window.closeHistoryModal = () => document.getElementById('history-modal').classList.add('hidden');
 
-        window.exportRoutineTasks = () => {
-            const data = JSON.stringify(routineTasks, null, 2);
-            const blob = new Blob([data], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = `tasks_${dataUserId}.json`; a.click();
-        };
-        window.importRoutineTasks = () => {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.onchange = e => {
-                const file = e.target.files[0];
-                const reader = new FileReader();
-                reader.onload = async event => {
-                    try {
-                        const tasks = JSON.parse(event.target.result);
-                        await setDoc(doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'routine_tasks'), { tasks });
-                        showMessage('success', '匯入成功', '任務清單已更新');
-                    } catch (err) { showMessage('error', '匯入失敗', '格式錯誤'); }
-                };
-                reader.readAsText(file);
-            };
-            input.click();
+        window.showUserSettingsModal = () => {
+            document.getElementById('modal-current-user-id').textContent = dataUserId;
+            document.getElementById('user-settings-modal').classList.remove('hidden');
         };
 
-        const initChart = () => {
-            const ctx = document.getElementById('workChart').getContext('2d');
-            statsChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: { labels: ['任務 (Task)', '臨時 (Ad-hoc)'], datasets: [{ data: [0, 0], backgroundColor: ['#60a5fa', '#f87171'], borderWidth: 0 }] },
-                options: { maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#94a3b8', boxWidth: 12 } } }, cutout: '75%' }
+        window.closeUserSettingsModal = () => {
+            document.getElementById('user-settings-modal').classList.add('hidden');
+        };
+
+        // 簡單的時間軸載入邏輯
+        function initApp() {
+            const today = new Date();
+            document.getElementById('header-date').textContent = today.toLocaleDateString();
+
+            // 監聽今日日誌 [cite: 41, 74]
+            onSnapshot(getDailyLogCollectionRef(), (snapshot) => {
+                const timeline = document.getElementById('daily-log-timeline');
+                timeline.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const item = document.createElement('div');
+                    item.className = "p-3 bg-slate-700/50 rounded border-l-2 border-indigo-400";
+                    item.innerHTML = `<span class="text-xs text-gray-400 font-mono">${data.time || ''}</span><p class="text-sm">${data.task}</p>`;
+                    timeline.appendChild(item);
+                });
             });
-        };
-        const updateChart = () => {
-            if (!statsChart) return;
-            const routine = dailyLogs.filter(l => l.type === 'Routine').length;
-            const adhoc = dailyLogs.filter(l => l.type === 'Ad-hoc').length;
-            statsChart.data.datasets[0].data = [routine, adhoc];
-            statsChart.update();
-            document.getElementById('stat-routine').textContent = routine;
-            document.getElementById('stat-adhoc').textContent = adhoc;
-            document.getElementById('log-count-badge').textContent = `${dailyLogs.length} ENTRIES`;
+        }
+
+        window.logAdHocTask = async () => {
+            const input = document.getElementById('adhoc-task-description');
+            if (!input.value) return;
+            
+            await addDoc(getDailyLogCollectionRef(), {
+                task: input.value,
+                type: 'Ad-hoc',
+                time: new Date().toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+                timestamp: serverTimestamp()
+            }); [cite: 32]
+            input.value = '';
         };
 
-        const getTodayDateString = () => new Date().toISOString().split('T')[0];
-        const formatDisplayDate = (d) => d.replace(/-/g, '/');
-        const showMessage = (type, title, body, onConfirm = null) => {
-            const modal = document.getElementById('message-modal');
-            document.getElementById('message-modal-title').textContent = title;
-            document.getElementById('message-modal-body').textContent = body;
-            const actions = document.getElementById('message-modal-actions');
-            actions.innerHTML = '';
-            if (onConfirm) {
-                const btn = document.createElement('button'); btn.className = "bg-red-600 px-4 py-2 rounded"; btn.textContent = "確認";
-                btn.onclick = () => { onConfirm(); modal.classList.add('hidden'); };
-                const cnl = document.createElement('button'); cnl.className = "bg-slate-700 px-4 py-2 rounded ml-2"; cnl.textContent = "取消";
-                cnl.onclick = () => modal.classList.add('hidden');
-                actions.appendChild(cnl); actions.appendChild(btn);
-            } else {
-                const ok = document.createElement('button'); ok.className = "bg-cyan-500 text-black px-6 py-2 rounded font-bold"; ok.textContent = "OK";
-                ok.onclick = () => modal.classList.add('hidden');
-                actions.appendChild(ok);
-            }
-            modal.classList.remove('hidden');
-        };
-
-        initApp();
-        window.completeTask = completeTask;
-        window.addRoutineTask = addRoutineTask;
-        window.deleteTaskDefinition = deleteTaskDefinition;
-        window.resetMonthlyStatus = resetMonthlyStatus;
     </script>
 </body>
 </html>
