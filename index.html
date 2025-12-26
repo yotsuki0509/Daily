@@ -199,11 +199,8 @@
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot, collection, query, where, addDoc, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        // 本機備用配置
-        let LOCAL_FIREBASE_CONFIG = {
+        // Firebase 嚴格配置
+        const LOCAL_FIREBASE_CONFIG = {
             apiKey: "AIzaSyAXnSDK_kY4Aa8XvL0M_Md9kA4Wdow_Uvs",
             authDomain: "daily-23c82.firebaseapp.com",
             projectId: "daily-23c82",
@@ -213,26 +210,28 @@
             measurementId: "G-6JN0N6BJHH"
         };
 
-        // Firebase 配置
-        let firebaseConfig = 
-            (typeof __firebase_config !== 'undefined' && __firebase_config !== 'null' && __firebase_config.length > 2) 
-                ? JSON.parse(__firebase_config) 
-                : LOCAL_FIREBASE_CONFIG; 
-
-        let app, db, auth;
-        // userId: Firebase Authentication 的真實 UID (用於驗證)
-        let authUserId = null; 
-        // dataUserId: 實際用來存取資料的 ID (可能是 authUserId 或 用戶自訂的 ID)
-        let dataUserId = null;
-        let isAuthReady = false;
-
         let firebaseConfig = (typeof __firebase_config !== 'undefined' && __firebase_config !== 'null' && __firebase_config.length > 2) 
             ? JSON.parse(__firebase_config) : LOCAL_FIREBASE_CONFIG;
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-
+              // --- 核心設定區 ---
+        // 將 appId 鎖定為您要求的 'default-app-id'
+        const appId = 'default-app-id'; 
+        
+        // 更新 UI 上的顯示，確保您知道目前連線的路徑
+        document.getElementById('app-id-display').textContent = appId;
+        
+        // Firestore 路徑定義邏輯 (這部分保持不變，但會引用上面的 appId)
+        const getRoutineTasksDocRef = () => dataUserId ? 
+            doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'routine_tasks') : null;
+        
+        const getMonthlyTasksDocRef = () => dataUserId ? 
+            doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'monthly_tasks') : null;
+        
+        const getDailyLogCollectionRef = (dateString = getTodayDateString()) => dataUserId ? 
+            collection(db, 'artifacts', appId, 'users', dataUserId, 'daily_logs', dateString, 'entries') : null;
 
         let dataUserId = localStorage.getItem('customUserId') || null;
         let routineTasks = [];
