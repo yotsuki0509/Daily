@@ -170,6 +170,9 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
+        // 確保路徑與 user 的要求一致
+        const COLLECTION_NAME = "daily_logs"; 
+
         let uid = localStorage.getItem('war_room_uid') || null;
         let tasks = [];
         let logs = [];
@@ -200,24 +203,23 @@
             onSnapshot(doc(db, 'artifacts', appId, 'users', uid, 'config', 'routine_tasks'), d => {
                 tasks = d.exists() ? d.data().tasks : [];
                 renderTasks();
-            });
+            }, (err) => console.error("Tasks Snapshot Error:", err));
 
             // 監聽每月狀態
             onSnapshot(doc(db, 'artifacts', appId, 'users', uid, 'config', 'monthly_status'), d => {
                 monthlyStatus = d.exists() ? d.data().status : {};
                 renderTasks();
-            });
+            }, (err) => console.error("Monthly Status Snapshot Error:", err));
 
-            // 監聽今日日誌
-            onSnapshot(query(collection(db, 'artifacts', appId, 'users', uid, 'logs'), where('date', '==', today)), snap => {
+            // 監聽今日日誌 (使用指定的 daily_logs 集合)
+            onSnapshot(query(collection(db, 'artifacts', appId, 'users', uid, COLLECTION_NAME), where('date', '==', today)), snap => {
                 logs = snap.docs.map(d => ({id: d.id, ...d.data()}));
                 renderTimeline();
                 renderTasks();
                 updateChart();
-            });
+            }, (err) => console.error("Today Logs Snapshot Error:", err));
         }
 
-        // 核心渲染：處理刪除線
         function renderTasks() {
             const container = document.getElementById('task-list-container');
             if (!container) return;
@@ -229,7 +231,6 @@
                 return acc;
             }, {});
 
-            // 判斷今日是否已完成
             const doneSet = new Set(logs.filter(l => l.type === 'Routine').map(l => l.taskKey));
 
             container.innerHTML = Object.keys(grouped).sort().map(cat => {
@@ -243,7 +244,6 @@
                         <div class="${isOpen?'':'hidden'} p-2 space-y-1 bg-slate-900/50">
                             ${grouped[cat].map(t => {
                                 const isDaily = t.type === 'Daily';
-                                // 如果是 Monthly，檢查 monthlyStatus 內是否有值
                                 const status = isDaily ? doneSet.has(t.name) : !!monthlyStatus[t.name];
                                 const typeTag = isDaily ? 
                                     `<span class="text-[9px] px-1 bg-blue-900 text-blue-300 mr-2 rounded">每日</span>` : 
@@ -274,7 +274,7 @@
             const dateSuffix = `${now.getMonth()+1}/${now.getDate()}`;
 
             try {
-                await addDoc(collection(db, 'artifacts', appId, 'users', uid, 'logs'), {
+                await addDoc(collection(db, 'artifacts', appId, 'users', uid, COLLECTION_NAME), {
                     taskName: type === 'Monthly' ? `${name} (${dateSuffix})` : name,
                     taskKey: name,
                     type: 'Routine',
@@ -290,30 +290,70 @@
             } catch (e) { console.error(e); }
         };
 
-        // 歷史功能
-        window.showHistory = () => document.getElementById('history-modal').classList.remove('hidden');
+        window.showHistory = () => {
+            document.getElementById('history-modal').classList.remove('hidden');
+            // 預設載入全部資料以便查看歷史
+            window.loadHistoryData(true);
+        };
         window.closeHistoryModal = () => document.getElementById('history-modal').classList.add('hidden');
+        
         window.loadHistoryData = async (all = false) => {
             const content = document.getElementById('history-content');
             const dateFilter = document.getElementById('history-filter-date').value;
-            content.innerHTML = '<div class="text-center py-10 animate-pulse text-cyan-400">連線中...</div>';
+            
+            content.innerHTML = '<div class="text-center py-10 animate-pulse text-cyan-400">正在同步歷史數據...</div>';
+            
             try {
-                const logsRef = collection(db, 'artifacts', appId, 'users', uid, 'logs');
-                let q = all ? query(logsRef) : query(logsRef, where('date', '==', dateFilter));
+                const logsRef = collection(db, 'artifacts', appId, 'users', uid, COLLECTION_NAME);
+                let q;
+                
+                if (all) {
+                    // Rule 2: Fetch all and sort in memory
+                    q = query(logsRef);
+                } else if (dateFilter) {
+                    q = query(logsRef, where('date', '==', dateFilter));
+                } else {
+                    content.innerHTML = '<div class="text-center py-10 text-slate-500">請選擇日期或點選顯示全部</div>';
+                    return;
+                }
+
                 const snap = await getDocs(q);
-                let data = snap.docs.map(d => d.data()).sort((a,b) => b.timestamp - a.timestamp);
-                if (!data.length) { content.innerHTML = '<div class="text-center py-10 text-slate-500">無紀錄</div>'; return; }
-                const grouped = data.reduce((acc, l) => { (acc[l.date] = acc[l.date] || []).push(l); return acc; }, {});
-                content.innerHTML = Object.keys(grouped).map(date => `
-                    <div class="bg-slate-900/50 p-4 rounded border border-slate-700">
-                        <div class="text-indigo-400 font-bold mb-2 border-b border-slate-800 pb-1">📅 ${date}</div>
-                        ${grouped[date].map(l => `<div class="flex justify-between py-1 border-b border-slate-800/50"><span>${l.taskName}</span><span class="text-slate-500 font-mono text-[10px]">${l.time}</span></div>`).join('')}
+                let data = snap.docs.map(d => d.data());
+                
+                // JS 內排序
+                data.sort((a,b) => b.timestamp - a.timestamp);
+
+                if (!data.length) { 
+                    content.innerHTML = '<div class="text-center py-10 text-slate-500">目前尚無歷史紀錄</div>'; 
+                    return; 
+                }
+
+                const grouped = data.reduce((acc, l) => { 
+                    const d = l.date || "未知日期";
+                    (acc[d] = acc[d] || []).push(l); 
+                    return acc; 
+                }, {});
+
+                content.innerHTML = Object.keys(grouped).sort((a,b) => b.localeCompare(a)).map(date => `
+                    <div class="bg-slate-900/50 p-4 rounded border border-slate-700 mb-4">
+                        <div class="text-indigo-400 font-bold mb-2 border-b border-slate-800 pb-1 flex justify-between">
+                            <span>📅 ${date}</span>
+                            <span class="text-[10px] text-slate-500">${grouped[date].length} 筆項目</span>
+                        </div>
+                        ${grouped[date].map(l => `
+                            <div class="flex justify-between py-1 border-b border-slate-800/50 hover:bg-slate-800/30 px-1 rounded">
+                                <span class="text-slate-300">${l.taskName}</span>
+                                <span class="text-slate-500 font-mono text-[10px]">${l.time || '--:--'}</span>
+                            </div>
+                        `).join('')}
                     </div>
                 `).join('');
-            } catch (e) { content.innerHTML = "讀取失敗"; }
+            } catch (e) { 
+                console.error("History Load Error:", e);
+                content.innerHTML = `<div class="text-center py-10 text-red-400">讀取失敗：${e.message}</div>`; 
+            }
         };
 
-        // 匯入匯出實作
         window.exportTasks = () => {
             const data = { tasks, timestamp: new Date().toISOString() };
             const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -342,7 +382,6 @@
             reader.readAsText(file);
         };
 
-        // 其他基礎功能
         window.toggleCat = (c) => { if (openCats.has(c)) openCats.delete(c); else openCats.add(c); renderTasks(); };
         window.saveNewTask = async () => {
             const name = document.getElementById('new-name').value.trim();
@@ -361,7 +400,7 @@
         window.submitAdhoc = async () => {
             const input = document.getElementById('adhoc-input');
             if (!input.value.trim()) return;
-            await addDoc(collection(db, 'artifacts', appId, 'users', uid, 'logs'), {
+            await addDoc(collection(db, 'artifacts', appId, 'users', uid, COLLECTION_NAME), {
                 taskName: `[${document.getElementById('adhoc-cat').value}] ${input.value}`,
                 type: 'Ad-hoc',
                 date: new Date().toISOString().split('T')[0],
@@ -370,12 +409,23 @@
             });
             input.value = '';
         };
-        window.delLog = async (id) => { if(confirm("刪除？")) await deleteDoc(doc(db, 'artifacts', appId, 'users', uid, 'logs', id)); };
+        window.delLog = async (id) => { if(confirm("刪除？")) await deleteDoc(doc(db, 'artifacts', appId, 'users', uid, COLLECTION_NAME, id)); };
         window.renderTimeline = () => {
             const container = document.getElementById('timeline-container');
             const sorted = [...logs].sort((a,b) => b.timestamp - a.timestamp);
             document.getElementById('log-count').textContent = `${logs.length} 筆`;
-            container.innerHTML = sorted.map(l => `<div class="timeline-item"><div class="timeline-dot"></div><div class="flex justify-between"><div><span class="text-[10px] text-cyan-500">${l.time}</span><p class="text-sm">${l.taskName}</p></div><button onclick="window.delLog('${l.id}')" class="text-slate-600 hover:text-red-400 text-xl">&times;</button></div></div>`).join('');
+            container.innerHTML = sorted.map(l => `
+                <div class="timeline-item">
+                    <div class="timeline-dot"></div>
+                    <div class="flex justify-between">
+                        <div>
+                            <span class="text-[10px] text-cyan-500 font-mono">${l.time || '00:00'}</span>
+                            <p class="text-sm text-slate-200">${l.taskName}</p>
+                        </div>
+                        <button onclick="window.delLog('${l.id}')" class="text-slate-600 hover:text-red-400 text-xl transition-colors">&times;</button>
+                    </div>
+                </div>
+            `).join('');
         };
         window.updateChart = () => {
             const r = logs.filter(l => l.type === 'Routine').length, a = logs.filter(l => l.type === 'Ad-hoc').length;
