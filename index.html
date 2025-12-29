@@ -4,8 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>每日工作日誌 - 戰情室 (含每月任務)</title>
+    <!-- 載入 Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 載入 Chart.js 用於圖表呈現 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- 調整字體為 Microsoft Yahei/JhengHei -->
     <style>
         body {
             /* 變更為 Microsoft YaHei (Windows) 和 Microsoft JhengHei (Mac) */
@@ -17,613 +20,1256 @@
             background-color: #1e293b; /* Slate 800 */
             border: 1px solid #334155; /* Slate 700 */
             border-radius: 0.75rem; /* rounded-xl */
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
         }
-        /* 自定義捲軸樣式 */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
+        .card:hover {
+            border-color: #06b6d4; /* Cyan 500 */
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.4); /* Cyan glow */
         }
-        ::-webkit-scrollbar-track {
-            background: #0f172a; 
+        /* 時間軸樣式 */
+        .timeline-item {
+            position: relative;
+            padding-left: 2.5rem;
+            padding-bottom: 1.5rem;
+            border-left: 2px solid #334155; /* Slate 700 */
         }
-        ::-webkit-scrollbar-thumb {
-            background: #475569; 
-            border-radius: 4px;
+        .timeline-item:last-child {
+            border-left: 2px solid transparent;
         }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #64748b; 
+        .timeline-dot {
+            position: absolute;
+            left: -10px;
+            top: 0;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background-color: #0f172a; /* Match body bg */
+            border: 2px solid #334155; /* Slate 700 */
+            box-shadow: 0 0 0 3px #1e293b; /* Slate 800 */
         }
-        .line-through-gray {
-            text-decoration: line-through;
-            color: #64748b; /* Slate 500 */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0f172a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.3s ease;
         }
-        /* 避免列印時被裁切 */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        .modal-content {
+            background-color: #1e293b;
+            color: #e2e8f0;
+            max-width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        /* 避免在簡報模式下顯示刪除按鈕 */
         @media print {
-            .no-print { display: none !important; }
-            .print-break-inside { break-inside: avoid; }
+            .no-print {
+                display: none !important;
+            }
         }
     </style>
 </head>
-<body class="min-h-screen p-4 md:p-6 lg:p-8">
-
-    <div id="login-overlay" class="fixed inset-0 bg-slate-900 bg-opacity-95 z-50 flex items-center justify-center">
-        <div class="card p-8 w-full max-w-md text-center">
-            <h2 class="text-2xl font-bold mb-4 text-blue-400">系統登入</h2>
-            <p class="mb-4 text-slate-400">請輸入您的用戶 ID 以讀取資料</p>
-            <input type="text" id="user-id-input" class="w-full bg-slate-700 border border-slate-600 rounded p-2 mb-4 text-white focus:outline-none focus:border-blue-500" placeholder="例如: user123">
-            <button onclick="initializeSystem()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded transition">
-                進入戰情室
-            </button>
+<body class="text-gray-100">
+    <!-- 載入中畫面 -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="text-center">
+            <svg class="animate-spin mx-auto h-10 w-10 text-cyan-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="text-gray-400 font-medium">個人戰情室系統載入中...</p>
         </div>
     </div>
 
-    <div id="dashboard" class="max-w-7xl mx-auto hidden">
+    <!-- 應用程式容器 -->
+    <div class="container mx-auto p-4 max-w-7xl" id="app-container" style="display: none;">
         
-        <header class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 bg-slate-800 p-6 rounded-xl card border-cyan-400 border-l-4 border-t-0 border-r-0 border-b-0">
             <div>
-                <h1 class="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">
-                    工作日誌戰情室
-                </h1>
-                <p class="text-slate-400 mt-1 flex items-center gap-2">
-                    <span id="current-date">載入中...</span>
-                    <span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-blue-300" id="display-user-id"></span>
+                <h1 class="text-3xl font-extrabold tracking-widest text-cyan-400">工作日誌 Crafted by 勝全 · Powered by AI</h1>
+                <p class="text-gray-400 mt-1 flex items-center text-sm">
+                    <svg class="w-4 h-4 mr-1 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    <span id="header-date" class="font-mono"></span>
                 </p>
             </div>
-            <div class="flex gap-3">
-                <button onclick="printReport()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition shadow-lg shadow-indigo-500/20">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                    </svg>
-                    匯出日報
+            <div class="mt-4 md:mt-0 flex space-x-3 no-print">
+                 <button onclick="togglePrintView()" class="flex items-center space-x-2 bg-slate-700 hover:bg-slate-600 text-gray-200 font-medium py-2 px-4 rounded-lg transition duration-150 text-sm">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                    <span>預覽/列印</span>
+                </button>
+                <button onclick="showHistoryModal()" class="flex items-center space-x-2 bg-indigo-500 hover:bg-indigo-600 text-white font-medium py-2 px-4 rounded-lg shadow-lg transition duration-150 text-sm">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span>歷史紀錄</span>
+                </button>
+                 <button onclick="showUserSettingsModal()" class="flex items-center space-x-2 bg-cyan-600 hover:bg-cyan-500 text-white font-medium py-2 px-4 rounded-lg shadow-lg transition duration-150 text-sm">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                    <span>帳號切換</span>
                 </button>
             </div>
         </header>
-
-        <div class="grid grid-cols-12 gap-6">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
-            <div class="col-span-12 lg:col-span-4 flex flex-col gap-6">
+            <!-- 左側欄：儀表板與快速輸入 (佔 4 等份) -->
+            <div class="lg:col-span-4 space-y-6">
                 
-                <div class="card p-5 flex flex-col h-auto max-h-[500px]" id="memo-section">
-                    <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
-                        <h2 class="text-xl font-bold text-yellow-400 flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                            臨時事項 / 備忘錄
-                        </h2>
-                        <span class="text-xs text-slate-500">Auto-save</span>
+                <!-- 儀表板圖表 -->
+                <div class="card p-6">
+                    <h2 class="text-lg font-bold text-cyan-400 mb-4 flex items-center border-b border-slate-700 pb-2">
+                        <svg class="w-5 h-5 mr-2 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path></svg>
+                        [ANALYSIS] 工作類型比例
+                    </h2>
+                    <div class="relative h-48">
+                        <canvas id="workChart"></canvas>
+                        <!-- 無資料時的遮罩 -->
+                        <div id="chart-placeholder" class="absolute inset-0 flex items-center justify-center bg-slate-800 bg-opacity-80 text-gray-500 text-sm hidden">
+                            尚無今日資料
+                        </div>
                     </div>
-                    
-                    <div class="flex gap-2 mb-3">
-                        <input type="text" id="memo-input" placeholder="輸入臨時事項..." 
-                            class="flex-1 bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-yellow-500 transition"
-                            onkeypress="if(event.key === 'Enter') addMemo()">
-                        <button onclick="addMemo()" class="bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-2 rounded transition">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                            </svg>
-                        </button>
-                    </div>
-
-                    <div class="flex-1 overflow-y-auto pr-1">
-                        <ul id="memo-list" class="space-y-2">
-                            </ul>
+                    <div class="grid grid-cols-2 gap-4 mt-4 text-center border-t border-slate-700 pt-4">
+                        <div class="p-3 bg-slate-700 rounded-lg">
+                            <!-- 例行工作 (Routine) 使用藍色 -->
+                            <span class="block text-2xl font-extrabold text-blue-400" id="stat-routine">0</span>
+                            <span class="text-xs text-gray-400">例行項目 (Routine)</span>
+                        </div>
+                        <div class="p-3 bg-slate-700 rounded-lg">
+                            <!-- 臨時狀況 (Ad-hoc) 使用紅色 -->
+                            <span class="block text-2xl font-extrabold text-red-400" id="stat-adhoc">0</span>
+                            <span class="text-xs text-gray-400">臨時狀況 (Ad-hoc)</span>
+                        </div>
                     </div>
                 </div>
 
-                <div class="card p-5 flex flex-col h-auto max-h-[500px]" id="monthly-section">
+                <!-- 記錄臨時事項 (Ad-hoc) - 快速輸入區 -->
+                <div class="card p-6 no-print">
+                    <h2 class="text-lg font-bold text-cyan-400 mb-3 flex items-center border-b border-slate-700 pb-2">
+                        <svg class="w-5 h-5 mr-2 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                        [QUICK CAPTURE] 臨時事項
+                    </h2>
+                    <div class="flex flex-col gap-3">
+                        <!-- 分類選擇 -->
+                        <select id="adhoc-category" class="w-full p-2.5 border border-slate-700 bg-slate-900 rounded-lg text-sm text-gray-100 focus:ring-red-500 focus:border-red-500">
+                            <option value="一般">📌 一般事項</option>
+                            <option value="會議">🗣️ 會議溝通</option>
+                            <option value="維修">🔧 維修/除錯</option>
+                            <option value="開發">💻 專案開發</option>
+                            <option value="支援">🤝 支援協助</option>
+                            <option value="行政">📄 行政處理</option>
+                        </select>
+                        <input type="text" id="adhoc-task-description" placeholder="發生了什麼事？ (例如：處理入庫單號異常)" class="w-full p-2.5 border border-slate-700 bg-slate-900 rounded-lg text-sm text-gray-100 focus:ring-red-500 focus:border-red-500">
+                        <button onclick="logAdHocTask()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg shadow-md transition duration-150 text-sm">
+                            紀錄 (Log Entry)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右側主面板：例行任務與時間軸日誌 (佔 8 等份) -->
+            <div class="lg:col-span-8 space-y-6">
+                
+                 <!-- 例行任務清單管理中心 (Routine Task Center) -->
+                <div class="card p-6 no-print">
+                    <h2 class="text-xl font-bold text-cyan-400 mb-4 flex items-center border-b border-slate-700 pb-2">
+                        <svg class="w-6 h-6 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                        [ROUTINE CENTER] 每日例行任務
+                    </h2>
+                    
+                    <!-- 任務列表 -->
+                    <div id="routine-tasks-list" class="space-y-3 mb-6 max-h-[400px] overflow-y-auto pr-2">
+                        <!-- 例行任務將由 JavaScript 載入並以分類收合方式呈現 -->
+                        <div class="text-center py-4 text-gray-500 text-sm bg-slate-700 rounded-lg border border-dashed border-slate-600">
+                            尚無設定例行任務
+                        </div>
+                    </div>
+                    
+                    <!-- 管理/新增例行任務區塊 -->
+                    <div class="border-t border-slate-700 pt-4">
+                        <div class="flex space-x-2 mb-3">
+                            <button onclick="document.getElementById('add-routine-form').classList.toggle('hidden')" class="flex-1 text-sm bg-slate-700 text-gray-200 hover:bg-slate-600 font-medium py-1.5 rounded-lg flex items-center justify-center transition duration-150">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                                新增任務
+                            </button>
+                            <button onclick="importRoutineTasks()" class="w-1/4 text-sm bg-indigo-500 text-white hover:bg-indigo-600 font-medium py-1.5 rounded-lg transition duration-150">匯入</button>
+                            <button onclick="exportRoutineTasks()" class="w-1/4 text-sm bg-indigo-500 text-white hover:bg-indigo-600 font-medium py-1.5 rounded-lg transition duration-150">匯出</button>
+                        </div>
+                        
+                        <div id="add-routine-form" class="mt-3 space-y-2 hidden bg-slate-700 p-4 rounded-lg border border-cyan-400">
+                            <input type="text" id="new-routine-task-category" placeholder="類別 (如: ERP, 報表, 行政)" class="w-full text-sm p-2 border border-slate-600 bg-slate-900 rounded focus:ring-cyan-500 focus:border-cyan-500 outline-none text-gray-100 placeholder-gray-500">
+                            <input type="text" id="new-routine-task-name" placeholder="任務名稱 (e.g., 確認GB會科倉)" class="w-full text-sm p-2 border border-slate-600 bg-slate-900 rounded focus:ring-cyan-500 focus:border-cyan-500 outline-none text-gray-100 placeholder-gray-500">
+                            <input type="text" id="new-routine-task-notes" placeholder="備註 (選填, e.g., 24550收料單明細表)" class="w-full text-sm p-2 border border-slate-600 bg-slate-900 rounded focus:ring-cyan-500 focus:border-cyan-500 outline-none text-gray-100 placeholder-gray-500">
+                            <button onclick="addRoutineTask()" class="w-full bg-cyan-500 text-slate-900 text-sm font-bold py-1.5 rounded hover:bg-cyan-400 transition duration-150">儲存任務</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- [NEW] 每月/長期任務專區 -->
+                <div class="card p-6 no-print">
                     <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
-                        <h2 class="text-xl font-bold text-purple-400 flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            每月/長期任務
+                        <h2 class="text-xl font-bold text-emerald-400 flex items-center">
+                            <svg class="w-6 h-6 mr-2 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                            [MONTHLY MISSION] 每月/長期任務
                         </h2>
-                        <button onclick="resetMonthlyTasks()" class="text-xs bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white px-2 py-1 rounded transition" title="重置所有任務狀態為未完成">
+                        <button onclick="resetMonthlyStatus()" class="text-xs bg-slate-700 text-gray-400 hover:text-white hover:bg-red-600 px-3 py-1 rounded transition-colors" title="新月份開始時點擊重置所有進度">
                             重置進度
                         </button>
                     </div>
                     
-                    <div class="flex gap-2 mb-3">
-                        <input type="text" id="monthly-input" placeholder="輸入每月或長期目標..." 
-                            class="flex-1 bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-purple-500 transition"
-                            onkeypress="if(event.key === 'Enter') addMonthlyTask()">
-                        <button onclick="addMonthlyTask()" class="bg-purple-600 hover:bg-purple-500 text-white px-3 py-2 rounded transition">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                            </svg>
-                        </button>
+                    <p class="text-xs text-gray-500 mb-4">此區任務完成後<span class="text-emerald-400 font-bold">不會</span>在隔天自動重置，適合紀錄月結、週報等非每日事項。</p>
+
+                    <!-- 每月任務列表 -->
+                    <div id="monthly-tasks-list" class="space-y-2 mb-4">
+                        <div class="text-center py-4 text-gray-500 text-sm bg-slate-700 rounded-lg border border-dashed border-slate-600">
+                            尚無每月任務
+                        </div>
                     </div>
 
-                    <div class="flex-1 overflow-y-auto pr-1">
-                        <ul id="monthly-list" class="space-y-2">
-                            </ul>
+                    <!-- 新增每月任務輸入框 -->
+                    <div class="flex space-x-2">
+                        <input type="text" id="new-monthly-task-name" placeholder="輸入每月任務名稱 (e.g. 製作月結報表)" class="flex-1 text-sm p-2 border border-slate-600 bg-slate-900 rounded focus:ring-emerald-500 focus:border-emerald-500 outline-none text-gray-100 placeholder-gray-500">
+                        <button onclick="addMonthlyTask()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold px-4 rounded transition duration-150">新增</button>
                     </div>
                 </div>
 
+                <!-- 時間軸日誌 (核心視覺化區域) -->
+                <div class="card p-6 min-h-[500px]">
+                    <div class="flex justify-between items-center mb-6 border-b border-slate-700 pb-2">
+                        <h2 class="text-xl font-bold text-cyan-400 flex items-center">
+                            <svg class="w-5 h-5 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            [DAILY LOG] 工作時間軸
+                        </h2>
+                        <span class="text-xs bg-slate-700 text-gray-400 px-3 py-1 rounded-full font-mono" id="log-count-badge">0 ENTRIES</span>
+                    </div>
+
+                    <div id="daily-log-timeline" class="pl-2">
+                        <!-- 時間軸內容由 JS 生成 -->
+                         <div class="flex flex-col items-center justify-center h-64 text-gray-600">
+                            <svg class="w-16 h-16 mb-2 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            <p>今日尚無紀錄，開始工作吧！</p>
+                        </div>
+                    </div>
+                </div>
             </div>
+        </div>
+        
+        <!-- Footer Info -->
+        <div class="mt-8 text-center text-xs text-gray-600 no-print">
+            <p>App ID: <span id="app-id-display" class="font-mono"></span> | Data Source: <span id="user-id-display" class="font-mono text-cyan-500"></span></p>
+        </div>
 
-            <div class="col-span-12 lg:col-span-8 flex flex-col gap-6">
-                
-                <div class="card p-5" id="routine-section">
-                    <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
-                        <h2 class="text-xl font-bold text-green-400 flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            每日例行公事 (Daily Routine)
-                        </h2>
-                        <div class="text-sm text-slate-400" id="routine-progress">0%</div>
+    </div>
+
+    <!-- 用戶設定與切換模態視窗 -->
+    <div id="user-settings-modal" class="modal-overlay hidden" style="z-index: 250;">
+        <div class="modal-content p-6 rounded-xl shadow-2xl w-full max-w-md">
+            <div class="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
+                <h3 class="text-xl font-bold text-cyan-400 flex items-center">
+                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                    用戶帳號設定 (跨裝置同步)
+                </h3>
+                <button onclick="closeUserSettingsModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            
+            <div class="space-y-6">
+                <div class="bg-slate-800 p-4 rounded-lg border border-slate-600">
+                    <label class="block text-xs text-gray-500 mb-1 uppercase tracking-wider">當前資料儲存 ID</label>
+                    <div class="flex items-center justify-between">
+                        <span id="modal-current-user-id" class="font-mono text-lg text-green-400 break-all font-bold">--</span>
+                        <span class="text-xs px-2 py-1 rounded bg-slate-700 text-gray-300 ml-2 whitespace-nowrap">使用中</span>
                     </div>
+                    <p class="text-xs text-gray-500 mt-2">注意：匿名登入的 ID 隨機產生，更換電腦會消失。若要跨電腦使用，請設定下方「自訂 ID」。</p>
+                </div>
 
-                    <div class="flex gap-2 mb-4 no-print">
-                        <input type="text" id="routine-input" placeholder="新增例行公事..." 
-                            class="flex-1 bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-green-500 transition"
-                            onkeypress="if(event.key === 'Enter') addRoutine()">
-                        <button onclick="addRoutine()" class="bg-green-600 hover:bg-green-500 text-white px-3 py-2 rounded transition">
-                            新增
+                <div class="bg-indigo-900/30 p-4 rounded-lg border border-indigo-500/50">
+                    <label class="block text-sm font-bold text-indigo-300 mb-2">設定自訂 ID (推薦)</label>
+                    <p class="text-xs text-gray-400 mb-3">設定一個容易記住的名稱 (如: `alex-work`)，在其他電腦輸入相同名稱即可同步資料。</p>
+                    <div class="flex space-x-2">
+                        <input type="text" id="custom-user-id-input" placeholder="輸入您的自訂 ID" class="flex-1 bg-slate-900 border border-indigo-500 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5">
+                        <button onclick="applyCustomUserId()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors">
+                            切換/載入
                         </button>
                     </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3" id="routine-list">
-                        </div>
                 </div>
 
-                <div class="card p-5 flex-1 min-h-[400px]" id="log-section">
-                    <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
-                        <h2 class="text-xl font-bold text-blue-400 flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            工作日誌時間軸
-                        </h2>
-                        <span id="log-count-badge" class="bg-blue-900 text-blue-200 text-xs px-2 py-1 rounded-full">0 筆</span>
-                    </div>
-
-                    <div class="flex flex-col gap-3 mb-6 no-print">
-                        <div class="flex gap-2">
-                            <input type="time" id="log-time" class="bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white focus:border-blue-500">
-                            <input type="text" id="log-content" placeholder="輸入工作內容..." 
-                                class="flex-1 bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white focus:border-blue-500"
-                                onkeypress="if(event.key === 'Enter') addLog()">
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <div class="flex gap-2">
-                                <span class="text-sm text-slate-500 pt-2">標籤:</span>
-                                <button onclick="setTag('會議')" class="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">會議</button>
-                                <button onclick="setTag('開發')" class="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">開發</button>
-                                <button onclick="setTag('測試')" class="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">測試</button>
-                                <button onclick="setTag('雜項')" class="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">雜項</button>
-                            </div>
-                            <button onclick="addLog()" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-1.5 rounded transition">
-                                提交日誌
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="relative border-l-2 border-slate-700 ml-3 space-y-6 pb-4" id="log-timeline">
-                        </div>
+                <div class="text-center pt-2">
+                     <button onclick="resetToSystemId()" class="text-xs text-red-400 hover:text-red-300 underline">
+                        重置為系統預設 ID (不推薦)
+                    </button>
                 </div>
-
             </div>
         </div>
     </div>
 
-    <div id="print-modal" class="hidden fixed inset-0 z-[100] bg-white text-black overflow-y-auto">
-        <div class="p-8 max-w-4xl mx-auto">
-            <div class="flex justify-end no-print mb-4">
-                <button onclick="document.getElementById('print-modal').classList.add('hidden')" class="mr-4 px-4 py-2 bg-gray-200 rounded text-gray-800">關閉</button>
-                <button onclick="window.print()" class="px-4 py-2 bg-blue-600 text-white rounded">列印 / 存為 PDF</button>
+    <!-- 歷史紀錄模態視窗 -->
+    <div id="history-modal" class="modal-overlay hidden" style="z-index: 150;">
+        <div class="modal-content p-0 rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div class="bg-indigo-600 p-4 flex justify-between items-center text-white">
+                <h2 class="text-xl font-bold flex items-center">
+                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    歷史紀錄查詢
+                </h2>
+                <button onclick="closeHistoryModal()" class="text-white hover:text-indigo-200 text-2xl font-light focus:outline-none">&times;</button>
             </div>
-            <div id="print-content" class="space-y-6">
+            
+            <div class="p-6 border-b border-slate-700 bg-slate-700">
+                <div class="flex items-center space-x-4">
+                    <label for="history-date-picker" class="font-medium text-gray-200">選擇日期:</label>
+                    <input type="date" id="history-date-picker" onchange="fetchLogsForDate(this.value)" class="p-2 border border-slate-600 bg-slate-900 rounded-lg text-sm text-gray-100 focus:ring-cyan-500 focus:border-cyan-500">
                 </div>
+            </div>
+
+            <div class="p-6 overflow-y-auto flex-1">
+                 <div id="history-log-entries" class="pl-2">
+                    <p class="text-gray-500 text-center py-10">請選擇日期以載入資料。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 簡報/列印模式模態視窗 -->
+    <div id="print-modal" class="modal-overlay hidden" style="z-index: 200;">
+        <!-- 使用一個淺色模式的容器來確保列印出來是白色背景 -->
+        <div class="modal-content bg-white text-gray-900 rounded-lg shadow-2xl w-full max-w-3xl overflow-hidden">
+             <div class="flex justify-between items-center p-4 border-b no-print bg-gray-50">
+                <h3 class="font-bold text-gray-700">工作日誌預覽 (按下 Ctrl+P 列印或存為 PDF)</h3>
+                <button onclick="document.getElementById('print-modal').classList.add('hidden')" class="text-gray-500 hover:text-gray-800 text-xl">&times;</button>
+            </div>
+            <div class="p-8 print-area" id="print-content" style="background-color: white;">
+                <!-- 內容由 JS 複製 -->
+            </div>
         </div>
     </div>
 
+    <!-- 訊息提示視窗 -->
+    <div id="message-modal" class="modal-overlay hidden" style="z-index: 300;">
+        <div class="modal-content p-6 rounded-xl shadow-2xl w-full max-w-sm text-center">
+            <div id="modal-icon" class="mb-4"></div>
+            <h3 id="message-modal-title" class="text-xl font-bold mb-2"></h3>
+            <p id="message-modal-body" class="mb-6 text-gray-400"></p>
+            <div id="message-modal-actions" class="flex justify-center space-x-3"></div>
+        </div>
+    </div>
+
+
+    <!-- Firebase SDKs -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getDatabase, ref, set, onValue, push, remove, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, query, where, addDoc, getDocs, setLogLevel, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // *** 請在此處填入您的 Firebase Config ***
-        // 為了安全與功能正常，請使用您原有的 Config 設定
-        const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-            databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT_ID.appspot.com",
-            messagingSenderId: "YOUR_SENDER_ID",
-            appId: "YOUR_APP_ID"
+        // Firebase 偵錯日誌
+        // setLogLevel('Debug');
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // 本機備用配置
+        let LOCAL_FIREBASE_CONFIG = {
+            apiKey: "AIzaSyAXnSDK_kY4Aa8XvL0M_Md9kA4Wdow_Uvs",
+            authDomain: "daily-23c82.firebaseapp.com",
+            projectId: "daily-23c82",
+            storageBucket: "daily-23c82.firebasestorage.app",
+            messagingSenderId: "574719251457",
+            appId: "1:574719251457:web:30aadb364406783b175c00",
+            measurementId: "G-6JN0N6BJHH"
         };
 
-        // 初始化 Firebase
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
+        // Firebase 配置
+        let firebaseConfig = 
+            (typeof __firebase_config !== 'undefined' && __firebase_config !== 'null' && __firebase_config.length > 2) 
+                ? JSON.parse(__firebase_config) 
+                : LOCAL_FIREBASE_CONFIG; 
 
-        // 全域變數
-        let dataUserId = "";
-        let routineTasks = [];
-        let memoList = [];
-        let logList = [];
-        let monthlyTasks = []; // NEW: 每月任務數據
+        let app, db, auth;
+        // userId: Firebase Authentication 的真實 UID (用於驗證)
+        let authUserId = null; 
+        // dataUserId: 實際用來存取資料的 ID (可能是 authUserId 或 用戶自訂的 ID)
+        let dataUserId = null;
+        let isAuthReady = false;
 
-        // 暴露給 window 以便 HTML onclick 使用
-        window.initializeSystem = initializeSystem;
-        window.addRoutine = addRoutine;
-        window.toggleRoutine = toggleRoutine;
-        window.deleteRoutine = deleteRoutine;
-        window.addMemo = addMemo;
-        window.deleteMemo = deleteMemo;
-        window.addLog = addLog;
-        window.deleteLog = deleteLog;
-        window.setTag = setTag;
-        window.printReport = printReport;
+        let routineTasks = []; 
+        let completedRoutineTaskNames = new Set(); 
         
-        // NEW: 每月任務函數暴露
-        window.addMonthlyTask = addMonthlyTask;
-        window.toggleMonthlyTask = toggleMonthlyTask;
-        window.deleteMonthlyTask = deleteMonthlyTask;
-        window.resetMonthlyTasks = resetMonthlyTasks;
+        // --- 新增：每月任務相關變數 ---
+        let monthlyTasks = []; // 儲存每月任務列表
+        let monthlyTaskStatus = {}; // 儲存每月任務完成狀態 { taskName: boolean/timestamp }
+        
+        let dailyLogs = [];
+        let statsChart = null;
+        
+        // 監聽器取消函數 (用於切換用戶時取消舊的監聽)
+        let unsubscribeRoutine = null;
+        let unsubscribeLogs = null;
+        let unsubscribeMonthly = null;
+        let unsubscribeMonthlyStatus = null;
+        
+        let openCategories = new Set(); 
+        
+        Chart.defaults.color = '#e2e8f0'; 
+        Chart.defaults.font.family = 'Microsoft YaHei, Microsoft JhengHei, Inter, sans-serif'; 
 
-        // 輔助：取得今日日期字串 YYYY-MM-DD
-        function getTodayDateString() {
-            const d = new Date();
-            const year = d.getFullYear();
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
+        // --- Chart.js Initialization ---
+        const initChart = () => {
+            if (statsChart) {
+                statsChart.destroy();
+            }
+            
+            const ctx = document.getElementById('workChart').getContext('2d');
+            statsChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['例行工作 (Routine)', '臨時狀況 (Ad-hoc)'],
+                    datasets: [{
+                        data: [0, 0], 
+                        backgroundColor: ['#60a5fa', '#f87171'], 
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { 
+                            position: 'right', 
+                            labels: { 
+                                usePointStyle: true,
+                                color: '#94a3b8' 
+                            } 
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(30, 41, 59, 0.9)', 
+                            titleColor: '#e2e8f0',
+                            bodyColor: '#e2e8f0',
+                        }
+                    },
+                    cutout: '70%',
+                }
+            });
+            updateChart(); 
+        };
+
+        const updateChart = () => {
+            if (!statsChart) return;
+            
+            let routineCount = 0;
+            let adhocCount = 0;
+
+            dailyLogs.forEach(log => {
+                if (log.type === 'Routine' || log.type === 'Monthly') routineCount++; // 將 Monthly 視為 Routine 統計
+                else adhocCount++;
+            });
+
+            statsChart.data.datasets[0].data = [routineCount, adhocCount];
+            statsChart.update();
+
+            document.getElementById('stat-routine').textContent = routineCount;
+            document.getElementById('stat-adhoc').textContent = adhocCount;
+            document.getElementById('log-count-badge').textContent = `${dailyLogs.length} ENTRIES`;
+
+            const placeholder = document.getElementById('chart-placeholder');
+            if (routineCount === 0 && adhocCount === 0) {
+                placeholder.classList.remove('hidden');
+            } else {
+                placeholder.classList.add('hidden');
+            }
+        };
+
+        // --- UI Utils ---
+        window.closeMessageModal = () => document.getElementById('message-modal').classList.add('hidden');
+
+        const showMessage = (type, title, body, onConfirm = null) => {
+            const modal = document.getElementById('message-modal');
+            const titleEl = document.getElementById('message-modal-title');
+            const bodyEl = document.getElementById('message-modal-body');
+            const actionsEl = document.getElementById('message-modal-actions');
+            const iconEl = document.getElementById('modal-icon');
+
+            titleEl.textContent = title;
+            bodyEl.textContent = body;
+            actionsEl.innerHTML = '';
+            titleEl.className = 'text-xl font-bold mb-2 ' + (type === 'error' ? 'text-red-400' : type === 'success' ? 'text-green-400' : 'text-cyan-400');
+
+            // Icon Setup
+            let iconColor, iconPath;
+            if (type === 'error') {
+                iconColor = 'text-red-400'; iconPath = 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z';
+            } else if (type === 'confirm' || type === 'warning') {
+                iconColor = 'text-yellow-400'; iconPath = 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z';
+            } else if (type === 'success') {
+                 iconColor = 'text-green-400'; iconPath = 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z';
+            } else {
+                iconColor = 'text-cyan-400'; iconPath = 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z';
+            }
+            iconEl.innerHTML = `<svg class="w-12 h-12 ${iconColor} mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${iconPath}"></path></svg>`;
+
+            if (onConfirm) {
+                const confirmBtn = document.createElement('button');
+                confirmBtn.className = "bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 font-medium";
+                confirmBtn.textContent = "確認";
+                confirmBtn.onclick = () => { window.closeMessageModal(); onConfirm(); };
+                
+                const cancelBtn = document.createElement('button');
+                cancelBtn.className = "bg-slate-700 text-gray-200 px-4 py-2 rounded-lg hover:bg-slate-600 font-medium";
+                cancelBtn.textContent = "取消";
+                cancelBtn.onclick = window.closeMessageModal;
+
+                actionsEl.appendChild(cancelBtn);
+                actionsEl.appendChild(confirmBtn);
+            } else {
+                const okBtn = document.createElement('button');
+                okBtn.className = "bg-cyan-500 text-slate-900 px-6 py-2 rounded-lg hover:bg-cyan-400 font-bold";
+                okBtn.textContent = "OK";
+                okBtn.onclick = window.closeMessageModal;
+                actionsEl.appendChild(okBtn);
+            }
+
+            modal.classList.remove('hidden');
+        };
+
+        window.toggleAccordion = (button, category, contentId, iconId) => {
+            const content = document.getElementById(contentId);
+            const icon = document.getElementById(iconId);
+            
+            if (!content || !icon) return;
+
+            if (content.classList.contains('hidden')) {
+                content.classList.remove('hidden');
+                icon.classList.add('rotate-180');
+                openCategories.add(category);
+            } else {
+                content.classList.add('hidden');
+                icon.classList.remove('rotate-180');
+                openCategories.delete(category);
+            }
+        };
+
+        const getTodayDateString = () => {
+            const date = new Date();
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
             return `${year}-${month}-${day}`;
-        }
-
-        // 輔助：顯示日期格式
-        function formatDisplayDate(dateStr) {
+        };
+        
+        const formatDisplayDate = (dateStr) => {
             const d = new Date(dateStr);
-            const days = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
-            return `${dateStr} (${days[d.getDay()]})`;
-        }
+            return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+        };
 
-        function initializeSystem() {
-            const inputId = document.getElementById('user-id-input').value.trim();
-            if (!inputId) {
-                alert("請輸入 User ID");
+        // Firestore 路徑定義 - 關鍵修改：使用 dataUserId 而非 authUserId
+        const getRoutineTasksDocRef = () => dataUserId ? doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'routine_tasks') : null;
+        
+        // [NEW] 每月任務的路徑
+        const getMonthlyTasksDocRef = () => dataUserId ? doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'monthly_tasks') : null;
+        const getMonthlyStatusDocRef = () => dataUserId ? doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'monthly_status') : null;
+
+        const getDailyLogCollectionRef = (dateString = getTodayDateString()) => dataUserId ? collection(db, 'artifacts', appId, 'users', dataUserId, 'daily_logs', dateString, 'entries') : null;
+
+        // --- User ID Management ---
+        const determineDataUserId = (authenticatedUid) => {
+            // 檢查 LocalStorage 是否有使用者自訂的 ID
+            const storedCustomId = localStorage.getItem('custom_user_id');
+            if (storedCustomId) {
+                return storedCustomId;
+            }
+            return authenticatedUid;
+        };
+
+        window.showUserSettingsModal = () => {
+            document.getElementById('modal-current-user-id').textContent = dataUserId || '尚未連線';
+            document.getElementById('custom-user-id-input').value = localStorage.getItem('custom_user_id') || '';
+            document.getElementById('user-settings-modal').classList.remove('hidden');
+        };
+
+        window.closeUserSettingsModal = () => {
+            document.getElementById('user-settings-modal').classList.add('hidden');
+        };
+
+        window.applyCustomUserId = () => {
+            const input = document.getElementById('custom-user-id-input').value.trim();
+            if (!input) {
+                showMessage('error', '錯誤', 'ID 不能為空');
                 return;
             }
-            dataUserId = inputId;
-            document.getElementById('display-user-id').textContent = dataUserId;
-            document.getElementById('login-overlay').classList.add('hidden');
-            document.getElementById('dashboard').classList.remove('hidden');
+            // 簡單的格式驗證
+            if (/[^a-zA-Z0-9\-_]/.test(input)) {
+                showMessage('error', '格式錯誤', 'ID 只能包含英文字母、數字、減號(-)與底線(_)');
+                return;
+            }
 
-            // 設定預設時間
-            const now = new Date();
-            document.getElementById('log-time').value = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-            document.getElementById('current-date').textContent = formatDisplayDate(getTodayDateString());
-
-            loadData();
-        }
-
-        function loadData() {
-            const todayStr = getTodayDateString();
-
-            // 1. 監聽每日例行公事 (路徑: users/{uid}/routineTasks)
-            // 注意：例行公事通常是固定的，這裡假設每天重置狀態，但清單內容保留
-            // 簡化邏輯：我們讀取 master list，並檢查是否今日已完成
-            // 為了簡化，這裡直接存取當日狀態。若要永久保存配置，建議分開存。
-            // 這裡沿用簡單邏輯：資料庫直接存當前狀態。
-            const routineRef = ref(db, `users/${dataUserId}/routineTasks`);
-            onValue(routineRef, (snapshot) => {
-                routineTasks = [];
-                const data = snapshot.val();
-                if (data) {
-                    Object.keys(data).forEach(key => {
-                        routineTasks.push({ id: key, ...data[key] });
-                    });
-                }
-                renderRoutine();
+            showMessage('confirm', '切換帳號', `確定要切換到 ID: ${input} 嗎？`, () => {
+                localStorage.setItem('custom_user_id', input);
+                window.location.reload(); // 重新整理最乾脆，確保所有狀態重置
             });
+        };
 
-            // 2. 監聽臨時事項 (路徑: users/{uid}/memos)
-            const memoRef = ref(db, `users/${dataUserId}/memos`);
-            onValue(memoRef, (snapshot) => {
-                memoList = [];
-                const data = snapshot.val();
-                if (data) {
-                    Object.keys(data).forEach(key => {
-                        memoList.push({ id: key, ...data[key] });
-                    });
-                }
-                renderMemos();
+        window.resetToSystemId = () => {
+             showMessage('warning', '重置確認', `確定要移除自訂 ID 並恢復為系統預設值嗎？您可能會看不到目前的資料。`, () => {
+                localStorage.removeItem('custom_user_id');
+                window.location.reload();
             });
+        };
 
-            // 3. 監聽工作日誌 (路徑: users/{uid}/logs/{date})
-            const logRef = ref(db, `users/${dataUserId}/logs/${todayStr}`);
-            onValue(logRef, (snapshot) => {
-                logList = [];
-                const data = snapshot.val();
-                if (data) {
-                    Object.keys(data).forEach(key => {
-                        logList.push({ id: key, ...data[key] });
-                    });
+        // --- Firebase Core ---
+        const initFirebase = async () => {
+            document.getElementById('header-date').textContent = formatDisplayDate(getTodayDateString());
+            document.getElementById('app-id-display').textContent = appId;
+            document.getElementById('history-date-picker').max = getTodayDateString();
+
+            if (!firebaseConfig?.apiKey) {
+                document.getElementById('loading-overlay').innerHTML = `<p class="text-red-400 font-bold text-xl">設定錯誤：缺少 Firebase API Key</p>`;
+                return;
+            }
+
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                await setPersistence(auth, browserSessionPersistence);
+
+                if (initialAuthToken) await signInWithCustomToken(auth, initialAuthToken);
+                else await signInAnonymously(auth);
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        authUserId = user.uid; // 這是 Firebase 認證的 UID
+                        isAuthReady = true;
+
+                        // 決定要讀取資料的 ID (自訂 ID 優先)
+                        dataUserId = determineDataUserId(authUserId);
+                        
+                        // 顯示目前使用的 Data Source ID
+                        const displayEl = document.getElementById('user-id-display');
+                        displayEl.textContent = dataUserId;
+                        // 如果是自訂 ID，加個標記
+                        if (dataUserId !== authUserId) {
+                             displayEl.textContent += " (Custom)";
+                             displayEl.classList.add("text-yellow-400");
+                        }
+                        
+                        initChart(); 
+                        loadRoutineTasks();
+                        loadMonthlyTasks(); // [NEW] 載入每月任務
+                        subscribeToDailyLogs();
+                        
+                        // UI Transition
+                        document.getElementById('loading-overlay').classList.add('opacity-0');
+                        setTimeout(() => {
+                            document.getElementById('loading-overlay').style.display = 'none';
+                            document.getElementById('app-container').style.display = 'block';
+                        }, 300);
+                        
+                        // 如果是第一次匿名登入且沒有設定自訂 ID，提示用戶
+                        if (dataUserId === authUserId && !localStorage.getItem('seen_user_tip')) {
+                             localStorage.setItem('seen_user_tip', 'true');
+                        }
+
+                    } else {
+                        document.getElementById('loading-overlay').innerHTML = `<p class="text-red-400">登入失敗，無法載入資料</p>`;
+                    }
+                });
+            } catch (error) {
+                console.error("Init Error:", error);
+                document.getElementById('loading-overlay').innerHTML = `<p class="text-red-400">系統初始化失敗: ${error.message}</p>`;
+            }
+        };
+
+        // --- Logic: Routine Tasks (with Category Grouping) ---
+        const loadRoutineTasks = () => {
+            if (!isAuthReady || !dataUserId) return;
+            
+            if (unsubscribeRoutine) unsubscribeRoutine(); // 取消舊的監聽
+
+            unsubscribeRoutine = onSnapshot(getRoutineTasksDocRef(), (docSnap) => {
+                if (docSnap.exists() && Array.isArray(docSnap.data().tasks)) {
+                    routineTasks = docSnap.data().tasks.map(task => ({
+                        // Ensure required fields exist
+                        name: task.name || '無名稱任務', 
+                        category: task.category || '未分類', 
+                        notes: task.notes || ''
+                    }));
+                } else {
+                    routineTasks = [];
                 }
-                // 排序：時間早到晚
-                logList.sort((a, b) => a.time.localeCompare(b.time));
-                renderLogs();
+                renderRoutineTasks(); 
+            }, (error) => {
+                console.error("Error loading routine tasks:", error);
+                if (error.code === 'permission-denied') {
+                     showMessage('error', '權限錯誤', '無法讀取資料。請確認您使用的自訂 ID 正確，或嘗試重置 ID。');
+                }
             });
+        };
+        
+        // [NEW] 載入每月任務與其狀態
+        const loadMonthlyTasks = () => {
+            if (!isAuthReady || !dataUserId) return;
 
-            // 4. NEW: 監聽每月/長期任務 (路徑: users/{uid}/monthlyTasks)
-            const monthlyRef = ref(db, `users/${dataUserId}/monthlyTasks`);
-            onValue(monthlyRef, (snapshot) => {
-                monthlyTasks = [];
-                const data = snapshot.val();
-                if (data) {
-                    Object.keys(data).forEach(key => {
-                        monthlyTasks.push({ id: key, ...data[key] });
-                    });
+            if (unsubscribeMonthly) unsubscribeMonthly();
+            if (unsubscribeMonthlyStatus) unsubscribeMonthlyStatus();
+
+            // 1. 監聽任務列表
+            unsubscribeMonthly = onSnapshot(getMonthlyTasksDocRef(), (docSnap) => {
+                if (docSnap.exists() && Array.isArray(docSnap.data().tasks)) {
+                    monthlyTasks = docSnap.data().tasks;
+                } else {
+                    monthlyTasks = [];
                 }
                 renderMonthlyTasks();
             });
-        }
 
-        // --- 每日例行公事邏輯 ---
-        function renderRoutine() {
-            const listEl = document.getElementById('routine-list');
-            listEl.innerHTML = '';
-            
-            let completedCount = 0;
-            
-            routineTasks.forEach(task => {
-                if (task.completed) completedCount++;
-                const div = document.createElement('div');
-                div.className = `flex items-center justify-between p-3 rounded border ${task.completed ? 'bg-slate-800 border-slate-700' : 'bg-slate-700/50 border-slate-600'}`;
-                
-                div.innerHTML = `
-                    <div class="flex items-center gap-3 overflow-hidden">
-                        <input type="checkbox" ${task.completed ? 'checked' : ''} 
-                            onchange="toggleRoutine('${task.id}', this.checked)"
-                            class="w-5 h-5 rounded border-slate-500 text-green-600 focus:ring-green-500 bg-slate-800 cursor-pointer">
-                        <span class="truncate ${task.completed ? 'line-through-gray' : 'text-slate-200'}">${task.text}</span>
-                    </div>
-                    <button onclick="deleteRoutine('${task.id}')" class="text-slate-500 hover:text-red-400 no-print px-2">
-                        &times;
-                    </button>
-                `;
-                listEl.appendChild(div);
+            // 2. 監聽完成狀態 (獨立於每日 Log)
+            unsubscribeMonthlyStatus = onSnapshot(getMonthlyStatusDocRef(), (docSnap) => {
+                if (docSnap.exists()) {
+                    monthlyTaskStatus = docSnap.data();
+                } else {
+                    monthlyTaskStatus = {};
+                }
+                renderMonthlyTasks();
             });
+        };
 
-            // 更新進度條
-            const progressEl = document.getElementById('routine-progress');
-            const total = routineTasks.length;
-            const percent = total === 0 ? 0 : Math.round((completedCount / total) * 100);
-            progressEl.textContent = `${percent}% (${completedCount}/${total})`;
-            progressEl.className = percent === 100 ? 'text-green-400 font-bold' : 'text-sm text-slate-400';
-        }
 
-        function addRoutine() {
-            const input = document.getElementById('routine-input');
-            const text = input.value.trim();
-            if (!text) return;
-            
-            const newRef = push(ref(db, `users/${dataUserId}/routineTasks`));
-            set(newRef, {
-                text: text,
-                completed: false
-            });
-            input.value = '';
-        }
-
-        function toggleRoutine(id, isChecked) {
-            update(ref(db, `users/${dataUserId}/routineTasks/${id}`), {
-                completed: isChecked
-            });
-        }
-
-        function deleteRoutine(id) {
-            if(confirm('確定刪除此例行公事？')) {
-                remove(ref(db, `users/${dataUserId}/routineTasks/${id}`));
+        const saveRoutineTasks = async (tasks) => {
+            if (!isAuthReady || !dataUserId) {
+                 showMessage('error', '驗證錯誤', '尚未連線，請稍候再試。');
+                 return;
             }
-        }
-
-        // --- 臨時事項邏輯 ---
-        function renderMemos() {
-            const listEl = document.getElementById('memo-list');
-            listEl.innerHTML = '';
-            
-            memoList.forEach(memo => {
-                const li = document.createElement('li');
-                li.className = 'flex justify-between items-start bg-slate-800 p-2 rounded border border-slate-700 text-sm';
-                li.innerHTML = `
-                    <span class="text-yellow-100/90 whitespace-pre-wrap flex-1 mr-2">${memo.text}</span>
-                    <button onclick="deleteMemo('${memo.id}')" class="text-slate-500 hover:text-red-400 no-print">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                `;
-                listEl.appendChild(li);
-            });
-        }
-
-        function addMemo() {
-            const input = document.getElementById('memo-input');
-            const text = input.value.trim();
-            if (!text) return;
-
-            const newRef = push(ref(db, `users/${dataUserId}/memos`));
-            set(newRef, { text: text });
-            input.value = '';
-        }
-
-        function deleteMemo(id) {
-            remove(ref(db, `users/${dataUserId}/memos/${id}`));
-        }
-
-        // --- NEW: 每月/長期任務邏輯 ---
-        function renderMonthlyTasks() {
-            const listEl = document.getElementById('monthly-list');
-            listEl.innerHTML = '';
-            
-            monthlyTasks.forEach(task => {
-                const li = document.createElement('li');
-                // 樣式參考 Daily Routine 但稍微緊湊一點
-                li.className = `flex items-center justify-between p-2 rounded border mb-1 ${task.completed ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-700/30 border-slate-600'}`;
-                
-                li.innerHTML = `
-                    <div class="flex items-center gap-2 overflow-hidden w-full">
-                        <input type="checkbox" ${task.completed ? 'checked' : ''} 
-                            onchange="toggleMonthlyTask('${task.id}', this.checked)"
-                            class="w-4 h-4 rounded border-slate-500 text-purple-600 focus:ring-purple-500 bg-slate-800 cursor-pointer">
-                        <span class="truncate text-sm ${task.completed ? 'line-through-gray' : 'text-slate-200'}">${task.text}</span>
-                    </div>
-                    <button onclick="deleteMonthlyTask('${task.id}')" class="text-slate-500 hover:text-red-400 no-print px-1 ml-2">
-                        &times;
-                    </button>
-                `;
-                listEl.appendChild(li);
-            });
-        }
-
-        function addMonthlyTask() {
-            const input = document.getElementById('monthly-input');
-            const text = input.value.trim();
-            if (!text) return;
-
-            const newRef = push(ref(db, `users/${dataUserId}/monthlyTasks`));
-            set(newRef, {
-                text: text,
-                completed: false
-            });
-            input.value = '';
-        }
-
-        function toggleMonthlyTask(id, isChecked) {
-            update(ref(db, `users/${dataUserId}/monthlyTasks/${id}`), {
-                completed: isChecked
-            });
-        }
-
-        function deleteMonthlyTask(id) {
-            if(confirm('確定刪除此任務？')) {
-                remove(ref(db, `users/${dataUserId}/monthlyTasks/${id}`));
+            try {
+                await setDoc(getRoutineTasksDocRef(), { tasks });
+            } catch (e) {
+                console.error("Save Routine Task Error:", e);
+                showMessage('error', '儲存失敗', `無法更新例行任務清單。錯誤: ${e.message}`);
             }
-        }
+        };
+        
+        // [NEW] 儲存每月任務
+        const saveMonthlyTasks = async (tasks) => {
+             if (!isAuthReady || !dataUserId) return;
+             try {
+                 await setDoc(getMonthlyTasksDocRef(), { tasks });
+             } catch(e) {
+                 showMessage('error', '儲存失敗', `無法更新每月任務清單。錯誤: ${e.message}`);
+             }
+        };
 
-        function resetMonthlyTasks() {
-            if(!confirm('確定要重置所有每月任務的進度嗎？(任務不會被刪除，只會取消勾選)')) return;
+        // [NEW] 更新每月任務狀態
+        const updateMonthlyTaskStatus = async (taskName, isCompleted) => {
+             if (!isAuthReady || !dataUserId) return;
+             try {
+                 const newStatus = { ...monthlyTaskStatus };
+                 if (isCompleted) {
+                     newStatus[taskName] = Date.now(); // 紀錄完成時間戳
+                 } else {
+                     delete newStatus[taskName]; // 移除代表未完成
+                 }
+                 await setDoc(getMonthlyStatusDocRef(), newStatus);
+             } catch(e) {
+                 console.error(e);
+             }
+        };
+        
+        // [NEW] 重置每月任務狀態
+        window.resetMonthlyStatus = () => {
+             showMessage('confirm', '重置確認', '確定要將所有「每月/長期任務」重置為未完成狀態嗎？(通常於月初執行)', async () => {
+                 try {
+                     await setDoc(getMonthlyStatusDocRef(), {});
+                     showMessage('success', '重置完成', '所有每月任務已重置。');
+                 } catch(e) {
+                     showMessage('error', '錯誤', e.message);
+                 }
+             });
+        };
+
+        window.addRoutineTask = async () => {
+            const category = document.getElementById('new-routine-task-category').value.trim() || '未分類';
+            const name = document.getElementById('new-routine-task-name').value.trim();
+            const notes = document.getElementById('new-routine-task-notes').value.trim();
             
-            // 批次更新
-            const updates = {};
-            monthlyTasks.forEach(task => {
-                updates[`users/${dataUserId}/monthlyTasks/${task.id}/completed`] = false;
+            if (!isAuthReady || !dataUserId) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
+            if (!name) return showMessage('error', '錯誤', '任務名稱不可為空');
+            
+            if (routineTasks.some(t => t.name === name)) return showMessage('error', '重複', '任務名稱已存在');
+
+            await saveRoutineTasks([...routineTasks, { name, category, notes }]);
+            document.getElementById('new-routine-task-category').value = '';
+            document.getElementById('new-routine-task-name').value = '';
+            document.getElementById('new-routine-task-notes').value = '';
+        };
+        
+        // [NEW] 新增每月任務
+        window.addMonthlyTask = async () => {
+             const nameInput = document.getElementById('new-monthly-task-name');
+             const name = nameInput.value.trim();
+             if(!name) return showMessage('error', '錯誤', '請輸入任務名稱');
+             
+             if (monthlyTasks.includes(name)) return showMessage('error', '重複', '此任務已存在');
+             
+             await saveMonthlyTasks([...monthlyTasks, name]);
+             nameInput.value = '';
+        };
+        
+        // [NEW] 刪除每月任務
+        window.deleteMonthlyTask = (name) => {
+             showMessage('confirm', '刪除任務', `確定要刪除每月任務「${name}」嗎？`, async () => {
+                  const newTasks = monthlyTasks.filter(t => t !== name);
+                  await saveMonthlyTasks(newTasks);
+                  // 同步清除狀態
+                  updateMonthlyTaskStatus(name, false);
+             });
+        };
+
+        window.deleteRoutineTaskByName = (taskName) => {
+            if (!isAuthReady || !dataUserId) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
+            const taskIndex = routineTasks.findIndex(t => t.name === taskName);
+            if (taskIndex === -1) return;
+            const task = routineTasks[taskIndex];
+            
+            showMessage('confirm', '刪除確認', `確定要永久刪除例行任務「${task.name}」嗎？這將同時刪除今日相關日誌。`, async () => {
+                try {
+                    const logsToDelete = dailyLogs.filter(l => l.type === 'Routine' && l.taskName === task.name);
+                    for (const log of logsToDelete) {
+                        await deleteDoc(doc(getDailyLogCollectionRef(), log.id));
+                    }
+                    const newTasks = routineTasks.filter(t => t.name !== task.name);
+                    await saveRoutineTasks(newTasks);
+                } catch (e) {
+                    console.error("Delete Routine Task Error:", e);
+                    showMessage('error', '刪除失敗', `無法刪除任務或相關日誌。錯誤: ${e.message}`);
+                }
             });
-            
-            update(ref(db), updates);
-        }
-
-
-        // --- 工作日誌邏輯 ---
-        function setTag(tag) {
-            const input = document.getElementById('log-content');
-            input.value = `【${tag}】 ` + input.value;
-            input.focus();
-        }
-
-        function renderLogs() {
-            const timeline = document.getElementById('log-timeline');
-            timeline.innerHTML = '';
-            document.getElementById('log-count-badge').textContent = `${logList.length} 筆`;
-
-            logList.forEach(log => {
-                const div = document.createElement('div');
-                div.className = 'relative pl-8 sm:pl-32 py-2 group';
+        };
+        
+        // --- Import/Export Logic ---
+        window.exportRoutineTasks = () => {
+            if (routineTasks.length === 0) {
+                return showMessage('info', '無資料', '例行任務清單為空，無需匯出。');
+            }
+            try {
+                const json = JSON.stringify(routineTasks, null, 2);
+                const blob = new Blob([json], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
                 
-                // 判斷 Tag 顏色
-                let tagColor = 'bg-blue-500';
-                if (log.content.includes('【會議】')) tagColor = 'bg-red-500';
-                else if (log.content.includes('【開發】')) tagColor = 'bg-emerald-500';
-                else if (log.content.includes('【測試】')) tagColor = 'bg-amber-500';
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `routine_tasks_export_${getTodayDateString()}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showMessage('success', '匯出成功', '例行任務清單已匯出為 JSON 文件。');
+            } catch (e) {
+                showMessage('error', '匯出失敗', '匯出過程中發生錯誤。');
+            }
+        };
 
-                div.innerHTML = `
-                    <div class="absolute left-[-5px] top-4 w-3 h-3 ${tagColor} rounded-full border-2 border-slate-900 z-10"></div>
-                    
-                    <div class="flex flex-col sm:flex-row items-start sm:items-center">
-                        <div class="font-mono text-sm text-slate-400 w-24 sm:absolute sm:left-2 sm:text-right mb-1 sm:mb-0">
-                            ${log.time}
-                        </div>
+        window.importRoutineTasks = () => {
+            if (!isAuthReady || !dataUserId) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = 'application/json';
+            fileInput.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = async (event) => {
+                    try {
+                        const importedData = JSON.parse(event.target.result);
+                        if (!Array.isArray(importedData) || importedData.some(item => typeof item.name !== 'string')) {
+                            throw new Error('JSON 格式不正確，應為包含 {name, category, notes} 的任務陣列。');
+                        }
                         
-                        <div class="bg-slate-800 rounded-lg p-3 border border-slate-700 w-full hover:border-blue-500/50 transition">
-                            <p class="text-slate-200 whitespace-pre-wrap">${log.content}</p>
-                        </div>
+                        const newTasksMap = new Map();
+                        routineTasks.forEach(task => newTasksMap.set(task.name, task));
+                        
+                        let uniqueCount = 0;
+                        importedData.forEach(task => {
+                            if (!task.name || typeof task.name !== 'string' || task.name.trim() === '') {
+                                console.warn("Skipping imported task with invalid name:", task);
+                                return;
+                            }
+                            
+                            const validTask = {
+                                category: task.category || '未分類',
+                                name: task.name.trim(),
+                                notes: task.notes || ''
+                            };
+                            if (!newTasksMap.has(validTask.name)) {
+                                newTasksMap.set(validTask.name, validTask);
+                                uniqueCount++;
+                            }
+                        });
 
-                        <button onclick="deleteLog('${log.id}')" class="ml-2 text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition no-print">
-                            &times;
-                        </button>
-                    </div>
-                `;
-                timeline.appendChild(div);
-            });
-        }
+                        const newRoutineTasks = Array.from(newTasksMap.values());
+                        
+                        await saveRoutineTasks(newRoutineTasks);
+                        showMessage('success', '匯入成功', `成功匯入 ${uniqueCount} 筆新任務。`);
 
-        function addLog() {
-            const timeInput = document.getElementById('log-time');
-            const contentInput = document.getElementById('log-content');
+                    } catch (error) {
+                        showMessage('error', '匯入失敗', `檔案解析錯誤或格式不符: ${error.message}`);
+                    }
+                };
+                reader.readAsText(file);
+            };
+            fileInput.click();
+        };
+
+        // --- Logic: Logs ---
+        const subscribeToDailyLogs = () => {
+            if (!isAuthReady || !dataUserId) return;
             
-            const time = timeInput.value;
-            const content = contentInput.value.trim();
-            const todayStr = getTodayDateString();
+            if (unsubscribeLogs) unsubscribeLogs(); // 取消舊的監聽
 
-            if (!time || !content) {
-                alert("請填寫時間與內容");
+            unsubscribeLogs = onSnapshot(getDailyLogCollectionRef(), (snapshot) => {
+                dailyLogs = [];
+                completedRoutineTaskNames.clear();
+                
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    dailyLogs.push({ id: doc.id, ...data });
+                    if (data.type === 'Routine' && data.taskName) {
+                        completedRoutineTaskNames.add(data.taskName);
+                    }
+                });
+                
+                dailyLogs.sort((a, b) => b.timestamp - a.timestamp); 
+                
+                renderTimeline(dailyLogs, document.getElementById('daily-log-timeline'));
+                renderRoutineTasks(); 
+                updateChart(); 
+            }, (error) => {
+                console.error("Error subscribing to daily logs:", error);
+            });
+        };
+
+        window.addLogEntry = async (type, description, taskName = null, category = '一般') => {
+            if (!description) return false;
+            if (!isAuthReady || !dataUserId) {
+                 showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，無法寫入日誌。');
+                 return false;
+            }
+            try {
+                await addDoc(getDailyLogCollectionRef(), {
+                    type, description, taskName, category,
+                    timestamp: Date.now(),
+                    timeString: new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                });
+                return true;
+            } catch (e) {
+                console.error("Log Entry Write Error:", e);
+                showMessage('error', '寫入失敗', `無法新增日誌。錯誤: ${e.message}`);
+                return false;
+            }
+        };
+
+        window.logAdHocTask = async () => {
+            const descInput = document.getElementById('adhoc-task-description');
+            const catInput = document.getElementById('adhoc-category');
+            if (!descInput.value.trim()) return showMessage('error', '空值', '請輸入描述');
+            
+            const success = await window.addLogEntry('AdHoc', descInput.value.trim(), null, catInput.value);
+            if (success) {
+                descInput.value = '';
+            }
+        };
+
+        window.deleteDailyLog = (id, dateStr) => {
+            if (!isAuthReady || !dataUserId) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
+            
+            showMessage('confirm', '刪除日誌', '確定要刪除這筆紀錄嗎？若是例行任務將會變回未完成狀態。', async () => {
+                try {
+                    await deleteDoc(doc(getDailyLogCollectionRef(dateStr), id));
+                    if (dateStr !== getTodayDateString()) fetchLogsForDate(dateStr); 
+                } catch (e) {
+                    console.error("Delete Log Error:", e);
+                    showMessage('error', '刪除失敗', `無法刪除日誌。錯誤: ${e.message}`);
+                }
+            });
+        };
+
+        // --- UI Rendering ---
+        
+        // [NEW] 渲染每月任務
+        const renderMonthlyTasks = () => {
+             const list = document.getElementById('monthly-tasks-list');
+             list.innerHTML = '';
+             
+             if (monthlyTasks.length === 0) {
+                 list.innerHTML = `<div class="text-center py-4 text-gray-500 text-sm bg-slate-700 rounded-lg border border-dashed border-slate-600">尚無每月任務</div>`;
+                 return;
+             }
+             
+             monthlyTasks.forEach(taskName => {
+                 const isDone = !!monthlyTaskStatus[taskName];
+                 
+                 const taskEl = document.createElement('div');
+                 taskEl.className = `flex items-center justify-between p-3 rounded-lg border-2 transition-all duration-200 ${isDone 
+                        ? 'border-emerald-600 bg-emerald-900/20 opacity-80' 
+                        : 'border-slate-700 hover:border-emerald-500 bg-slate-700/50'}`;
+                 
+                 taskEl.innerHTML = `
+                    <div class="flex items-center space-x-3 flex-1 overflow-hidden">
+                        <div class="relative flex items-center shrink-0">
+                            <input type="checkbox" id="monthly-${taskName}" class="peer h-6 w-6 cursor-pointer appearance-none rounded-md border-2 border-slate-500 shadow-sm checked:bg-emerald-500 checked:border-emerald-500 bg-slate-900 transition-colors duration-200" ${isDone ? 'checked' : ''}>
+                            <svg class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none opacity-0 peer-checked:opacity-100 text-slate-900 transition-opacity duration-200" viewBox="0 0 14 10" fill="none"><path d="M1 5L4.5 8.5L13 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </div>
+                        <label for="monthly-${taskName}" class="truncate text-base font-medium ${isDone ? 'text-gray-400 line-through' : 'text-gray-100'} cursor-pointer select-none">
+                            ${taskName}
+                        </label>
+                    </div>
+                    <button onclick="deleteMonthlyTask('${taskName}')" class="text-gray-600 hover:text-red-500 ml-4 p-1 shrink-0 no-print">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                 `;
+                 
+                 // 每月任務 Checkbox 邏輯: 點擊切換狀態 + 寫 Log (如果是勾選)
+                 taskEl.querySelector('input').addEventListener('change', async (e) => {
+                     const isChecked = e.target.checked;
+                     e.target.disabled = true; // 防止連點
+                     
+                     try {
+                         // 1. 更新永久狀態
+                         await updateMonthlyTaskStatus(taskName, isChecked);
+                         // 2. 如果是勾選，幫忙寫入今日 Log (讓老闆知道今天做了這件事)
+                         if (isChecked) {
+                             await window.addLogEntry('Monthly', `[每月任務] 完成: ${taskName}`, null, '月度任務');
+                         }
+                     } catch(err) {
+                         console.error(err);
+                         e.target.checked = !isChecked; // Revert
+                     } finally {
+                         e.target.disabled = false;
+                     }
+                 });
+                 
+                 list.appendChild(taskEl);
+             });
+        };
+
+        const renderRoutineTasks = () => {
+            const list = document.getElementById('routine-tasks-list');
+            list.innerHTML = '';
+            
+            if (routineTasks.length === 0) {
+                list.innerHTML = `<div class="text-center py-4 text-gray-500 text-sm bg-slate-700 rounded-lg border border-dashed border-slate-600">尚無設定例行任務</div>`;
                 return;
             }
 
-            const newRef = push(ref(db, `users/${dataUserId}/logs/${todayStr}`));
-            set(newRef, {
-                time: time,
-                content: content
+            const tasksByCategory = routineTasks.reduce((acc, task) => {
+                const category = task.category || '未分類';
+                if (!acc[category]) {
+                    acc[category] = [];
+                }
+                acc[category].push(task);
+                return acc;
+            }, {});
+
+            let categoryIndex = 0; 
+
+            Object.entries(tasksByCategory).forEach(([category, tasks]) => {
+                const completedTasksCount = tasks.filter(task => completedRoutineTaskNames.has(task.name)).length;
+                const totalTasksCount = tasks.length;
+                const progressPercent = totalTasksCount > 0 ? Math.round((completedTasksCount / totalTasksCount) * 100) : 0;
+                const isAllDone = completedTasksCount === totalTasksCount;
+                
+                const isOpened = openCategories.has(category);
+                
+                const uniqueIdSuffix = `cat-${categoryIndex++}`;
+                const contentId = `content-${uniqueIdSuffix}`;
+                const iconId = `icon-${uniqueIdSuffix}`;
+
+                const headerBaseClass = 'relative z-10 flex items-center justify-between w-full p-3 text-base font-semibold text-left rounded-lg transition-colors duration-150 border overflow-hidden';
+                const headerStyleClass = isAllDone ? 'border-blue-500 hover:border-blue-400' : 'border-slate-700 hover:border-cyan-400';
+                const progressColor = isAllDone ? 'bg-blue-600/70' : 'bg-cyan-600/70';
+                
+                const categoryHeader = document.createElement('div');
+                categoryHeader.className = "relative mb-2";
+
+                categoryHeader.innerHTML = `
+                    <button onclick="toggleAccordion(this, '${category}', '${contentId}', '${iconId}')" class="${headerBaseClass} ${headerStyleClass}">
+                        <div class="absolute inset-0 h-full transition-all duration-300 pointer-events-none" style="width: ${progressPercent}%;">
+                            <div class="h-full ${progressColor}"></div>
+                        </div>
+                        <span class="relative z-20 truncate text-gray-100">${category}</span>
+                        <div class="relative z-20 flex items-center space-x-2">
+                             <span class="text-sm font-bold ${isAllDone ? 'text-blue-200' : 'text-cyan-200'}">${progressPercent}%</span>
+                             <span class="text-sm font-medium ${isAllDone ? 'text-blue-100' : 'text-gray-300'}">(${completedTasksCount}/${totalTasksCount})</span>
+                             <svg id="${iconId}" class="w-4 h-4 transform transition-transform duration-300 ${isOpened ? 'rotate-180' : 'rotate-0'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </div>
+                    </button>
+                    <div id="${contentId}" class="space-y-1 p-3 bg-slate-800 border border-slate-700 rounded-b-lg ${isOpened ? '' : 'hidden'}">
+                    </div>
+                `;
+                list.appendChild(categoryHeader);
+
+                const taskListContainer = categoryHeader.querySelector('div.space-y-1');
+
+                tasks.forEach((task) => {
+                    const isDone = completedRoutineTaskNames.has(task.name);
+                    
+                    const taskEl = document.createElement('div');
+                    taskEl.className = `flex items-center justify-between p-3 rounded-lg border-2 transition-all duration-200 ${isDone 
+                        ? 'border-blue-700 bg-blue-900/20 opacity-70' 
+                        : 'border-slate-700 hover:border-cyan-400 bg-slate-700/50'}`;
+                    
+                    taskEl.innerHTML = `
+                        <div class="flex items-center space-x-3 flex-1 overflow-hidden">
+                            <div class="relative flex items-center shrink-0">
+                                <input type="checkbox" id="task-${task.name}" data-task-name="${task.name}" class="peer h-6 w-6 cursor-pointer appearance-none rounded-md border-2 border-slate-500 shadow-sm checked:bg-cyan-500 checked:border-cyan-500 bg-slate-900 transition-colors duration-200" ${isDone ? 'checked disabled' : ''}>
+                                <svg class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none opacity-0 peer-checked:opacity-100 text-slate-900 transition-opacity duration-200" viewBox="0 0 14 10" fill="none"><path d="M1 5L4.5 8.5L13 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </div>
+                            <label for="task-${task.name}" class="truncate text-base font-medium ${isDone ? 'text-gray-500 line-through' : 'text-gray-100'} cursor-pointer select-none">
+                                ${task.name}
+                                ${task.notes ? `<span class="block text-xs text-gray-400 font-normal mt-0.5">${task.notes}</span>` : ''}
+                            </label>
+                        </div>
+                        ${!isDone ? `<button onclick="deleteRoutineTaskByName('${task.name}')" class="text-gray-600 hover:text-red-500 ml-4 p-1 shrink-0 no-print"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>` : ''}
+                    `;
+
+                    if (!isDone) {
+                        taskEl.querySelector('input').addEventListener('change', async (e) => {
+                             e.target.disabled = true;
+                             const success = await window.addLogEntry('Routine', `完成: ${task.name} (${category})`, task.name, category);
+                             if (!success) { 
+                                 e.target.disabled = false; 
+                                 e.target.checked = false; 
+                             }
+                        });
+                    }
+                    taskListContainer.appendChild(taskEl);
+                });
             });
-            
-            contentInput.value = '';
-            // 時間自動加 1 小時方便下一筆，或保持原樣，這裡保持原樣
-        }
+        };
 
-        function deleteLog(id) {
-            const todayStr = getTodayDateString();
-            if(confirm('刪除此日誌？')) {
-                remove(ref(db, `users/${dataUserId}/logs/${todayStr}/${id}`));
+        const renderTimeline = (logs, container, isHistory = false, dateStr = getTodayDateString()) => {
+            container.innerHTML = '';
+            if (logs.length === 0) {
+                container.innerHTML = `<div class="flex flex-col items-center justify-center h-64 text-gray-600"><svg class="w-16 h-16 mb-2 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg><p>${isHistory ? `日期 ${formatDisplayDate(dateStr)} 查無紀錄。` : '今日尚無紀錄，開始工作吧！'}</p></div>`;
+                return;
             }
-        }
 
-        // --- 列印報表 ---
-        function printReport() {
-            const printContent = document.getElementById('print-content');
+            logs.forEach(log => {
+                const isRoutine = log.type === 'Routine' || log.type === 'Monthly';
+                // [NEW] 如果是 Monthly 使用綠色 Icon
+                const isMonthly = log.type === 'Monthly';
+                
+                let iconColor = isMonthly ? 'text-emerald-400' : (isRoutine ? 'text-blue-400' : 'text-red-400');
+                let dotClass = isMonthly ? 'bg-emerald-500 border-emerald-700' : (isRoutine ? 'bg-blue-500 border-blue-700' : 'bg-red-500 border-red-700');
+                
+                const icon = isRoutine 
+                    ? `<svg class="w-4 h-4 ${iconColor}" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>`
+                    : `<svg class="w-4 h-4 ${iconColor}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+                
+                const logItem = document.createElement('div');
+                logItem.className = 'timeline-item';
+                logItem.innerHTML = `
+                    <div class="timeline-dot ${dotClass}"></div>
+                    <div class="card p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <p class="text-sm font-bold text-gray-100 flex items-center mb-1">
+                                    ${icon}
+                                    <span class="ml-2">${log.description}</span>
+                                </p>
+                                <p class="text-xs text-gray-400 font-mono">
+                                    [${log.type}] ${log.category}
+                                </p>
+                            </div>
+                            <div class="flex items-center space-x-3 shrink-0">
+                                <span class="text-sm font-mono text-cyan-400">${log.timeString}</span>
+                                <button onclick="deleteDailyLog('${log.id}', '${dateStr}')" class="text-gray-500 hover:text-red-500 no-print" title="刪除日誌">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(logItem);
+            });
+        };
+
+        window.showHistoryModal = () => {
+            document.getElementById('history-modal').classList.remove('hidden');
+            const today = getTodayDateString();
+            document.getElementById('history-date-picker').value = today;
+            fetchLogsForDate(today);
+        };
+
+        window.closeHistoryModal = () => {
+            document.getElementById('history-modal').classList.add('hidden');
+        };
+
+        window.fetchLogsForDate = async (dateStr) => {
+            const container = document.getElementById('history-log-entries');
+            container.innerHTML = `<p class="text-gray-500 text-center py-10">載入中...</p>`;
+
+            if (!isAuthReady || !dataUserId) {
+                 container.innerHTML = `<p class="text-red-400 text-center py-10">驗證失敗，無法查詢歷史紀錄。</p>`;
+                 return;
+            }
+
+            try {
+                const logCollectionRef = getDailyLogCollectionRef(dateStr);
+                const querySnapshot = await getDocs(logCollectionRef);
+
+                const historyLogs = [];
+                querySnapshot.forEach(doc => {
+                    historyLogs.push({ id: doc.id, ...doc.data() });
+                });
+                
+                historyLogs.sort((a, b) => b.timestamp - a.timestamp);
+
+                renderTimeline(historyLogs, container, true, dateStr);
+
+            } catch (e) {
+                console.error("Error fetching history logs:", e);
+                container.innerHTML = `<p class="text-red-400 text-center py-10">查詢歷史紀錄失敗: ${e.message}</p>`;
+            }
+        };
+
+        window.togglePrintView = () => {
             const printModal = document.getElementById('print-modal');
+            const printContent = document.getElementById('print-content');
             
-            printContent.innerHTML = '';
-            
-            // 複製 Routine 區塊
-            const routineBlock = document.getElementById('routine-section').cloneNode(true);
-            
-            // NEW: 複製 Monthly 區塊
-            const monthlyBlock = document.getElementById('monthly-section').cloneNode(true);
-            
-            // 複製 Log 區塊
-            // 注意：我們需要調整 Log 區塊在列印時的樣式，可能不需要輸入框
-            const logBlock = document.querySelector('#log-section').cloneNode(true);
+            // 複製 Routine Center 和 Monthly Center
+            const routineBlock = document.querySelector('.lg\\:col-span-8 > .card:nth-child(1)').cloneNode(true);
+            const monthlyBlock = document.querySelector('.lg\\:col-span-8 > .card:nth-child(2)').cloneNode(true);
+            const logBlock = document.querySelector('.lg\\:col-span-8 > .card:last-child').cloneNode(true);
 
             [routineBlock, monthlyBlock, logBlock].forEach(block => {
-                block.classList.remove('card'); // 移除深色背景樣式以便列印更清晰，或保留依個人喜好
-                // 這裡保留 card class 但移除輸入區
                 block.querySelectorAll('.no-print').forEach(el => el.remove());
                 block.querySelectorAll('button').forEach(el => el.remove());
-                block.querySelectorAll('input[type="text"]').forEach(el => el.parentElement?.remove());
-                block.querySelectorAll('input[type="time"]').forEach(el => el.parentElement?.remove());
-                
-                // 確保列印時顏色正確 (Tailwind dark mode print fix)
-                block.style.color = '#000';
-                block.style.backgroundColor = '#fff';
-                block.style.border = '1px solid #ddd';
+                // 移除輸入框
+                block.querySelectorAll('input[type="text"]').forEach(el => el.parentElement.remove());
             });
+
+            logBlock.querySelector('#log-count-badge')?.remove();
             
-            // 標題修正
+            const logTitleEl = logBlock.querySelector('h2');
+            if (logTitleEl) {
+                logTitleEl.textContent = `日誌時間軸 (${formatDisplayDate(getTodayDateString())})`;
+            }
+
             const headerHTML = `
                 <div class="text-center mb-6">
                     <h1 class="text-3xl font-extrabold text-gray-800">工作日誌報告</h1>
@@ -633,32 +1279,15 @@
             `;
 
             printContent.innerHTML = headerHTML;
-            
-            // 依序加入 (這裡使用 Grid 或 Flex 來排版列印頁面)
-            const gridContainer = document.createElement('div');
-            gridContainer.className = 'grid grid-cols-1 gap-6'; // 列印時通常單欄比較清楚，或維持雙欄
-            
-            // 加入標題修飾
-            const addTitle = (el, title) => {
-                const h = el.querySelector('h2'); 
-                if(h) h.className = 'text-xl font-bold text-black border-b pb-2 mb-2';
-            }
-
-            // Routine
-            addTitle(routineBlock);
             printContent.appendChild(routineBlock);
-
-            // Monthly
-            addTitle(monthlyBlock);
             printContent.appendChild(monthlyBlock);
-
-            // Logs
-            addTitle(logBlock);
-            logBlock.querySelector('#log-timeline').classList.remove('ml-3', 'border-l-2'); // 移除時間軸線條簡化列印
             printContent.appendChild(logBlock);
             
             printModal.classList.remove('hidden');
         };
+
+        window.onload = initFirebase;
+
     </script>
 </body>
 </html>
