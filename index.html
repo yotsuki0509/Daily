@@ -353,7 +353,7 @@
         </div>
     </div>
 
-    <!-- 編輯任務模態視窗 (NEW) -->
+    <!-- 編輯任務模態視窗 -->
     <div id="edit-task-modal" class="modal-overlay hidden" style="z-index: 260;">
         <div class="modal-content p-6 rounded-xl shadow-2xl w-full max-w-md bg-slate-800 border border-slate-600">
             <h3 class="text-xl font-bold text-cyan-400 mb-4 flex items-center">
@@ -377,6 +377,28 @@
                 <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-slate-700">
                     <button onclick="closeEditModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-gray-300 rounded-lg text-sm transition-colors">取消</button>
                     <button onclick="saveTaskEdits()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg text-sm transition-colors shadow-lg shadow-cyan-500/30">儲存變更</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+     <!-- 編輯類別模態視窗 (NEW) -->
+    <div id="edit-category-modal" class="modal-overlay hidden" style="z-index: 270;">
+        <div class="modal-content p-6 rounded-xl shadow-2xl w-full max-w-sm bg-slate-800 border border-slate-600">
+            <h3 class="text-xl font-bold text-cyan-400 mb-4 flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
+                編輯類別名稱
+            </h3>
+            <input type="hidden" id="edit-category-original-name">
+            <div class="space-y-4">
+                <p class="text-xs text-gray-400">注意：這將會批次修改所有屬於此類別的任務名稱。</p>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">新類別名稱</label>
+                    <input type="text" id="edit-category-name" class="w-full p-2.5 border border-slate-600 bg-slate-900 rounded-lg text-gray-100 focus:ring-cyan-500 focus:border-cyan-500 outline-none">
+                </div>
+                <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-slate-700">
+                    <button onclick="closeEditCategoryModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-gray-300 rounded-lg text-sm transition-colors">取消</button>
+                    <button onclick="saveCategoryEdits()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg text-sm transition-colors shadow-lg shadow-cyan-500/30">確認修改</button>
                 </div>
             </div>
         </div>
@@ -1046,7 +1068,96 @@
             }
         };
 
-        // --- NEW: Sort Task Logic ---
+        // --- NEW: Edit & Move Category Logic ---
+        
+        window.closeEditCategoryModal = () => document.getElementById('edit-category-modal').classList.add('hidden');
+        
+        window.openEditCategoryModal = (categoryName) => {
+            document.getElementById('edit-category-original-name').value = categoryName;
+            document.getElementById('edit-category-name').value = categoryName;
+            document.getElementById('edit-category-modal').classList.remove('hidden');
+        };
+
+        window.saveCategoryEdits = async () => {
+            const oldName = document.getElementById('edit-category-original-name').value;
+            const newName = document.getElementById('edit-category-name').value.trim();
+            
+            if (!newName) return showMessage('error', '錯誤', '類別名稱不可為空');
+            if (oldName === newName) {
+                closeEditCategoryModal();
+                return;
+            }
+
+            if (!isAuthReady || !dataUserId) return showMessage('error', '錯誤', '系統尚未就緒');
+            
+            try {
+                // 1. 批量更新任務的類別名稱
+                const newTasks = routineTasks.map(t => {
+                    if ((t.category || '未分類') === oldName) {
+                        return { ...t, category: newName };
+                    }
+                    return t;
+                });
+                
+                // 2. 更新今日相關日誌 (避免改類別後，日誌還留在舊類別)
+                const logsToUpdate = dailyLogs.filter(l => l.category === oldName);
+                for (const log of logsToUpdate) {
+                     await updateDoc(doc(getDailyLogCollectionRef(), log.id), { category: newName });
+                }
+
+                await saveRoutineTasks(newTasks);
+                
+                // 如果舊類別是展開的，新類別也要展開，並移除舊的
+                if (openCategories.has(oldName)) {
+                    openCategories.delete(oldName);
+                    openCategories.add(newName);
+                }
+                
+                closeEditCategoryModal();
+                showMessage('success', '類別更新', `類別已從「${oldName}」更名為「${newName}」。`);
+            } catch (e) {
+                 console.error("Update Category Error:", e);
+                 showMessage('error', '更新失敗', `無法更新類別: ${e.message}`);
+            }
+        };
+
+        window.moveCategory = async (categoryName, direction) => {
+            if (!isAuthReady || !dataUserId) return showMessage('error', '錯誤', '系統尚未就緒');
+            
+            // 1. 先將目前任務依類別分組 (保持現有順序)
+            const tasksByCategory = {};
+            const categoryOrder = [];
+            
+            routineTasks.forEach(t => {
+                const cat = t.category || '未分類';
+                if (!tasksByCategory[cat]) {
+                    tasksByCategory[cat] = [];
+                    categoryOrder.push(cat);
+                }
+                tasksByCategory[cat].push(t);
+            });
+            
+            // 2. 找到要移動的類別 index
+            const idx = categoryOrder.indexOf(categoryName);
+            if (idx === -1) return;
+            
+            // 3. 交換類別順序
+            const targetIdx = idx + direction;
+            if (targetIdx < 0 || targetIdx >= categoryOrder.length) return; // 無法移動
+            
+            [categoryOrder[idx], categoryOrder[targetIdx]] = [categoryOrder[targetIdx], categoryOrder[idx]];
+            
+            // 4. 依照新的類別順序，重新組建 routineTasks 陣列
+            // 這會隱性地將所有任務重新排序，這對於「類別排序」是必要的，因為我們沒有獨立存儲類別設定
+            const newRoutineTasks = [];
+            categoryOrder.forEach(cat => {
+                newRoutineTasks.push(...tasksByCategory[cat]);
+            });
+            
+            // 5. 儲存
+            await saveRoutineTasks(newRoutineTasks);
+        };
+
         window.moveTask = async (taskName, direction) => {
             if (!isAuthReady || !dataUserId) return showMessage('error', '錯誤', '系統尚未就緒');
             
@@ -1073,7 +1184,7 @@
             
             if (!swapTargetName) return; // 無法移動 (已經是第一個或最後一個)
 
-            // 4. 在主陣列中交換位置 (這樣可以保持類別間的相對關係，同時改變類別內的順序)
+            // 4. 在主陣列中交換位置
             const targetIndex = routineTasks.findIndex(t => t.name === swapTargetName);
             
             // 交換
@@ -1083,7 +1194,6 @@
             
             // 5. 儲存
             await saveRoutineTasks(routineTasks);
-            // 不需手動呼叫 render，因為 onSnapshot 會觸發
         };
 
 
@@ -1108,8 +1218,10 @@
             }, {});
 
             let categoryIndex = 0; 
+            const categoryKeys = Object.keys(tasksByCategory);
 
-            Object.entries(tasksByCategory).forEach(([category, tasks]) => {
+            categoryKeys.forEach((category, catIdx) => {
+                const tasks = tasksByCategory[category];
                 // 計算完成度
                 let completedCount = 0;
                 tasks.forEach(task => {
@@ -1131,25 +1243,44 @@
                 const contentId = `content-${uniqueIdSuffix}`;
                 const iconId = `icon-${uniqueIdSuffix}`;
 
-                const headerBaseClass = 'relative z-10 flex items-center justify-between w-full p-3 text-base font-semibold text-left rounded-lg transition-colors duration-150 border overflow-hidden';
+                const headerBaseClass = 'relative z-10 flex items-center justify-between w-full text-base font-semibold text-left rounded-lg transition-colors duration-150 border overflow-hidden pr-2';
                 const headerStyleClass = isAllDone ? 'border-blue-500 hover:border-blue-400' : 'border-slate-700 hover:border-cyan-400';
                 const progressColor = isAllDone ? 'bg-blue-600/70' : 'bg-cyan-600/70';
                 
+                const isFirstCat = catIdx === 0;
+                const isLastCat = catIdx === categoryKeys.length - 1;
+
                 const categoryHeader = document.createElement('div');
                 categoryHeader.className = "relative mb-2";
 
                 categoryHeader.innerHTML = `
-                    <button onclick="toggleAccordion(this, '${category}', '${contentId}', '${iconId}')" class="${headerBaseClass} ${headerStyleClass}">
+                    <div class="${headerBaseClass} ${headerStyleClass}">
                         <div class="absolute inset-0 h-full transition-all duration-300 pointer-events-none" style="width: ${progressPercent}%;">
                             <div class="h-full ${progressColor}"></div>
                         </div>
-                        <span class="relative z-20 truncate text-gray-100">${category}</span>
-                        <div class="relative z-20 flex items-center space-x-2">
-                             <span class="text-sm font-bold ${isAllDone ? 'text-blue-200' : 'text-cyan-200'}">${progressPercent}%</span>
-                             <span class="text-sm font-medium ${isAllDone ? 'text-blue-100' : 'text-gray-300'}">(${completedCount}/${totalTasksCount})</span>
-                             <svg id="${iconId}" class="w-4 h-4 transform transition-transform duration-300 ${isOpened ? 'rotate-180' : 'rotate-0'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        
+                        <div class="relative z-20 flex-1 flex items-center cursor-pointer p-3" onclick="toggleAccordion(this, '${category}', '${contentId}', '${iconId}')">
+                             <span class="truncate text-gray-100 font-bold mr-2">${category}</span>
+                             <span class="text-xs ${isAllDone ? 'text-blue-100' : 'text-gray-300'}">(${completedCount}/${totalTasksCount})</span>
                         </div>
-                    </button>
+
+                        <div class="relative z-30 flex items-center space-x-1 no-print bg-slate-800/80 rounded px-1 py-1">
+                             <button onclick="openEditCategoryModal('${category}')" class="text-gray-400 hover:text-cyan-400 p-1" title="編輯類別名稱">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                             </button>
+                             <div class="flex flex-col">
+                                <button onclick="moveCategory('${category}', -1)" class="${isFirstCat ? 'text-slate-600 cursor-default' : 'text-gray-400 hover:text-white'} p-0.5 -mb-1" ${isFirstCat ? 'disabled' : ''}>
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7"></path></svg>
+                                </button>
+                                <button onclick="moveCategory('${category}', 1)" class="${isLastCat ? 'text-slate-600 cursor-default' : 'text-gray-400 hover:text-white'} p-0.5 -mt-1" ${isLastCat ? 'disabled' : ''}>
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7"></path></svg>
+                                </button>
+                             </div>
+                             <div class="pointer-events-none ml-2">
+                                <svg id="${iconId}" class="w-4 h-4 transform transition-transform duration-300 ${isOpened ? 'rotate-180' : 'rotate-0'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                             </div>
+                        </div>
+                    </div>
                     <div id="${contentId}" class="space-y-1 p-3 bg-slate-800 border border-slate-700 rounded-b-lg ${isOpened ? '' : 'hidden'}">
                     </div>
                 `;
