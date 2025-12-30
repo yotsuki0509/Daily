@@ -1,5 +1,3 @@
---- START OF FILE 程式碼.txt ---
-
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -1008,12 +1006,7 @@
                         <div class="absolute inset-0 h-full transition-all duration-300 pointer-events-none" style="width: ${progressPercent}%;">
                             <div class="h-full ${progressColor}"></div>
                         </div>
-                        <div class="relative z-20 truncate text-gray-100 flex items-center">
-                            <span>${category}</span>
-                            <span onclick="window.editCategory(event, '${category}')" class="ml-2 p-1 text-gray-500 hover:text-white no-print" title="編輯類別名稱">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                            </span>
-                        </div>
+                        <span class="relative z-20 truncate text-gray-100">${category}</span>
                         <div class="relative z-20 flex items-center space-x-2">
                              <span class="text-sm font-bold ${isAllDone ? 'text-blue-200' : 'text-cyan-200'}">${progressPercent}%</span>
                              <span class="text-sm font-medium ${isAllDone ? 'text-blue-100' : 'text-gray-300'}">(${completedCount}/${totalTasksCount})</span>
@@ -1057,12 +1050,7 @@
                                 ${task.notes ? `<span class="ml-2 text-xs text-gray-400 font-normal">(${task.notes})</span>` : ''}
                             </label>
                         </div>
-                        <div class="flex items-center space-x-2 no-print ml-2">
-                            <button onclick="window.editTask(event, '${task.name}')" class="text-gray-500 hover:text-cyan-400 p-1" title="編輯任務內容">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                            </button>
-                            ${!isDone ? `<button onclick="deleteRoutineTaskByName('${task.name}')" class="text-gray-600 hover:text-red-500 p-1 shrink-0 no-print"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>` : ''}
-                        </div>
+                        ${!isDone ? `<button onclick="deleteRoutineTaskByName('${task.name}')" class="text-gray-600 hover:text-red-500 ml-4 p-1 shrink-0 no-print"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>` : ''}
                     `;
 
                     if (!isDone) {
@@ -1211,54 +1199,7 @@
             printModal.classList.remove('hidden');
         };
 
-        // --- 編輯功能輔助邏輯 ---
-
-        // 1. 編輯類別名稱
-        window.editCategory = (event, oldCategory) => {
-            event.stopPropagation(); // 防止點擊按鈕時觸發展合
-            const newCategory = prompt("請輸入新的類別名稱：", oldCategory);
-            if (!newCategory || newCategory === oldCategory) return;
-            
-            const updatedTasks = routineTasks.map(task => {
-                if (task.category === oldCategory) {
-                    return { ...task, category: newCategory };
-                }
-                return task;
-            });
-            
-            saveRoutineTasks(updatedTasks);
-        };
-
-        // 2. 編輯任務詳細資料
-        window.editTask = (event, oldName) => {
-            event.stopPropagation();
-            const task = routineTasks.find(t => t.name === oldName);
-            if (!task) return;
-
-            const newName = prompt("編輯任務名稱：", task.name);
-            if (!newName) return;
-            
-            const newCat = prompt("編輯任務類別：", task.category);
-            const newNotes = prompt("編輯任務備註：", task.notes);
-            const isMonthly = confirm("是否設為每月任務？ (確定: Monthly / 取消: Daily)");
-            const newFreq = isMonthly ? "Monthly" : "Daily";
-
-            const updatedTasks = routineTasks.map(t => {
-                if (t.name === oldName) {
-                    return { name: newName, category: newCat || task.category, notes: newNotes, frequency: newFreq };
-                }
-                return t;
-            });
-
-            saveRoutineTasks(updatedTasks);
-        };
-
         window.onload = initFirebase;
-
-        // 確保在模組載入時嘗試執行 (防止 window.onload 沒觸發)
-        setTimeout(() => {
-            if (!isAuthReady) initFirebase();
-        }, 1000);
 
     </script>
 </body>
