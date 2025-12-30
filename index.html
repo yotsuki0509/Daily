@@ -1003,15 +1003,14 @@
                 const categoryHeader = document.createElement('div');
                 categoryHeader.className = "relative mb-2";
 
-                // 修改這部分：在類別名稱旁新增「編輯類別」按鈕
                 categoryHeader.innerHTML = `
                     <button onclick="toggleAccordion(this, '${category}', '${contentId}', '${iconId}')" class="${headerBaseClass} ${headerStyleClass}">
                         <div class="absolute inset-0 h-full transition-all duration-300 pointer-events-none" style="width: ${progressPercent}%;">
                             <div class="h-full ${progressColor}"></div>
                         </div>
-                        <div class="relative z-20 flex items-center truncate">
-                            <span class="text-gray-100">${category}</span>
-                            <span onclick="editCategoryName(event, '${category}')" class="ml-2 p-1 text-gray-400 hover:text-white no-print" title="編輯類別名稱">
+                        <div class="relative z-20 truncate text-gray-100 flex items-center">
+                            <span>${category}</span>
+                            <span onclick="window.editCategory(event, '${category}')" class="ml-2 p-1 text-gray-500 hover:text-white no-print" title="編輯類別名稱">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                             </span>
                         </div>
@@ -1032,6 +1031,7 @@
                     const isMonthly = task.frequency === 'Monthly';
                     const isDone = isMonthly ? !!monthlyTaskStatus[task.name] : completedRoutineTaskNames.has(task.name);
                     
+                    // 根據頻率決定顏色：每月使用綠色系，每日使用藍色系
                     const activeColorClass = isMonthly 
                         ? (isDone ? 'border-emerald-600 bg-emerald-900/20 opacity-70' : 'border-slate-700 hover:border-emerald-500 bg-slate-700/50')
                         : (isDone ? 'border-blue-700 bg-blue-900/20 opacity-70' : 'border-slate-700 hover:border-cyan-400 bg-slate-700/50');
@@ -1045,7 +1045,6 @@
                         ? `<span class="text-[10px] bg-emerald-700 text-white px-1.5 py-0.5 rounded ml-2 font-mono">月</span>`
                         : `<span class="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded ml-2 font-mono">日</span>`;
 
-                    // 修改這部分：在刪除按鈕旁新增「編輯任務」按鈕
                     taskEl.innerHTML = `
                         <div class="flex items-center space-x-3 flex-1 overflow-hidden">
                             <div class="relative flex items-center shrink-0">
@@ -1058,11 +1057,11 @@
                                 ${task.notes ? `<span class="ml-2 text-xs text-gray-400 font-normal">(${task.notes})</span>` : ''}
                             </label>
                         </div>
-                        <div class="flex items-center space-x-2 no-print">
-                            <button onclick="editTaskDetails('${task.name}')" class="text-gray-400 hover:text-cyan-400 p-1" title="編輯任務內容">
+                        <div class="flex items-center space-x-2 no-print ml-2">
+                            <button onclick="window.editTask(event, '${task.name}')" class="text-gray-500 hover:text-cyan-400 p-1" title="編輯任務內容">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                             </button>
-                            ${!isDone ? `<button onclick="deleteRoutineTaskByName('${task.name}')" class="text-gray-600 hover:text-red-500 p-1" title="刪除任務"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>` : ''}
+                            ${!isDone ? `<button onclick="deleteRoutineTaskByName('${task.name}')" class="text-gray-600 hover:text-red-500 p-1 shrink-0 no-print"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>` : ''}
                         </div>
                     `;
 
@@ -1212,69 +1211,54 @@
             printModal.classList.remove('hidden');
         };
 
-        // --- 新增的編輯邏輯函式 ---
+        // --- 編輯功能輔助邏輯 ---
 
         // 1. 編輯類別名稱
-        window.editCategoryName = (event, oldCategory) => {
-            event.stopPropagation(); // 防止點擊編輯按鈕時觸發手風琴收合
-            const newCategory = prompt(`請輸入類別「${oldCategory}」的新名稱：`, oldCategory);
+        window.editCategory = (event, oldCategory) => {
+            event.stopPropagation(); // 防止點擊按鈕時觸發展合
+            const newCategory = prompt("請輸入新的類別名稱：", oldCategory);
+            if (!newCategory || newCategory === oldCategory) return;
             
-            if (!newCategory || newCategory.trim() === "" || newCategory === oldCategory) return;
-
-            // 更新所有屬於該類別的任務
             const updatedTasks = routineTasks.map(task => {
                 if (task.category === oldCategory) {
-                    return { ...task, category: newCategory.trim() };
+                    return { ...task, category: newCategory };
                 }
                 return task;
             });
-
-            // 更新已展開的類別 Set
-            if (openCategories.has(oldCategory)) {
-                openCategories.delete(oldCategory);
-                openCategories.add(newCategory.trim());
-            }
-
+            
             saveRoutineTasks(updatedTasks);
         };
 
-        // 2. 編輯任務詳細內容
-        window.editTaskDetails = (taskName) => {
-            const task = routineTasks.find(t => t.name === taskName);
+        // 2. 編輯任務詳細資料
+        window.editTask = (event, oldName) => {
+            event.stopPropagation();
+            const task = routineTasks.find(t => t.name === oldName);
             if (!task) return;
 
-            const newName = prompt(`編輯任務名稱：`, task.name);
-            if (!newName || newName.trim() === "") return;
-
-            // 檢查名稱是否與其他任務重複 (除非是自己)
-            if (newName !== task.name && routineTasks.some(t => t.name === newName)) {
-                alert("任務名稱已重複，請使用其他名稱。");
-                return;
-            }
-
-            const newNotes = prompt(`編輯任務備註：`, task.notes || "");
-            const isMonthly = confirm(`任務頻率設定：\n按下「確定」設為每月任務 (Monthly)\n按下「取消」設為每日任務 (Daily)`);
+            const newName = prompt("編輯任務名稱：", task.name);
+            if (!newName) return;
+            
+            const newCat = prompt("編輯任務類別：", task.category);
+            const newNotes = prompt("編輯任務備註：", task.notes);
+            const isMonthly = confirm("是否設為每月任務？ (確定: Monthly / 取消: Daily)");
             const newFreq = isMonthly ? "Monthly" : "Daily";
 
             const updatedTasks = routineTasks.map(t => {
-                if (t.name === taskName) {
-                    return { ...t, name: newName.trim(), notes: newNotes, frequency: newFreq };
+                if (t.name === oldName) {
+                    return { name: newName, category: newCat || task.category, notes: newNotes, frequency: newFreq };
                 }
                 return t;
             });
-
-            // 如果修改了任務名稱，且該任務原本有每月完成紀錄，則需要處理紀錄遷移
-            if (newName !== taskName && monthlyTaskStatus[taskName]) {
-                 const newStatus = { ...monthlyTaskStatus };
-                 newStatus[newName] = newStatus[taskName];
-                 delete newStatus[taskName];
-                 setDoc(getMonthlyStatusDocRef(), newStatus);
-            }
 
             saveRoutineTasks(updatedTasks);
         };
 
         window.onload = initFirebase;
+
+        // 確保在模組載入時嘗試執行 (防止 window.onload 沒觸發)
+        setTimeout(() => {
+            if (!isAuthReady) initFirebase();
+        }, 1000);
 
     </script>
 </body>
