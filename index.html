@@ -5,7 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>每日工作日誌 - 戰情室 (編輯強化版)</title>
+    <title>每日工作日誌 - 戰情室 (整合版)</title>
     <!-- 載入 Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 載入 Chart.js 用於圖表呈現 -->
@@ -13,6 +13,7 @@
     <!-- 調整字體為 Microsoft Yahei/JhengHei -->
     <style>
         body {
+            /* 變更為 Microsoft YaHei (Windows) 和 Microsoft JhengHei (Mac) */
             font-family: 'Microsoft YaHei', 'Microsoft JhengHei', 'Inter', sans-serif;
             background-color: #0f172a; /* Slate 900 */
             color: #e2e8f0; /* Gray 200 */
@@ -28,11 +29,12 @@
             border-color: #06b6d4; /* Cyan 500 */
             box-shadow: 0 0 15px rgba(6, 182, 212, 0.4); /* Cyan glow */
         }
+        /* 時間軸樣式 */
         .timeline-item {
             position: relative;
             padding-left: 2.5rem;
             padding-bottom: 1.5rem;
-            border-left: 2px solid #334155;
+            border-left: 2px solid #334155; /* Slate 700 */
         }
         .timeline-item:last-child {
             border-left: 2px solid transparent;
@@ -44,9 +46,9 @@
             width: 18px;
             height: 18px;
             border-radius: 50%;
-            background-color: #0f172a;
-            border: 2px solid #334155;
-            box-shadow: 0 0 0 3px #1e293b;
+            background-color: #0f172a; /* Match body bg */
+            border: 2px solid #334155; /* Slate 700 */
+            box-shadow: 0 0 0 3px #1e293b; /* Slate 800 */
         }
         .loading-overlay {
             position: fixed;
@@ -80,6 +82,7 @@
             max-height: 90vh;
             overflow-y: auto;
         }
+        /* 避免在簡報模式下顯示刪除按鈕 */
         @media print {
             .no-print {
                 display: none !important;
@@ -140,30 +143,34 @@
                     </h2>
                     <div class="relative h-48">
                         <canvas id="workChart"></canvas>
+                        <!-- 無資料時的遮罩 -->
                         <div id="chart-placeholder" class="absolute inset-0 flex items-center justify-center bg-slate-800 bg-opacity-80 text-gray-500 text-sm hidden">
                             尚無今日資料
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-4 mt-4 text-center border-t border-slate-700 pt-4">
                         <div class="p-3 bg-slate-700 rounded-lg">
+                            <!-- 例行工作 (Routine) 使用藍色 -->
                             <span class="block text-2xl font-extrabold text-blue-400" id="stat-routine">0</span>
                             <span class="text-xs text-gray-400">例行項目 (Routine)</span>
                         </div>
                         <div class="p-3 bg-slate-700 rounded-lg">
+                            <!-- 臨時狀況 (Ad-hoc) 使用紅色 -->
                             <span class="block text-2xl font-extrabold text-red-400" id="stat-adhoc">0</span>
                             <span class="text-xs text-gray-400">臨時狀況 (Ad-hoc)</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- 快速輸入區 -->
+                <!-- 記錄臨時事項 (Ad-hoc) - 快速輸入區 -->
                 <div class="card p-6 no-print">
                     <h2 class="text-lg font-bold text-cyan-400 mb-3 flex items-center border-b border-slate-700 pb-2">
                         <svg class="w-5 h-5 mr-2 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                         [QUICK CAPTURE] 臨時事項
                     </h2>
                     <div class="flex flex-col gap-3">
-                        <select id="adhoc-category" class="w-full p-2.5 border border-slate-700 bg-slate-900 rounded-lg text-sm text-gray-100">
+                        <!-- 分類選擇 -->
+                        <select id="adhoc-category" class="w-full p-2.5 border border-slate-700 bg-slate-900 rounded-lg text-sm text-gray-100 focus:ring-red-500 focus:border-red-500">
                             <option value="一般">📌 一般事項</option>
                             <option value="會議">🗣️ 會議溝通</option>
                             <option value="維修">🔧 維修/除錯</option>
@@ -171,7 +178,7 @@
                             <option value="支援">🤝 支援協助</option>
                             <option value="行政">📄 行政處理</option>
                         </select>
-                        <input type="text" id="adhoc-task-description" placeholder="發生了什麼事？" class="w-full p-2.5 border border-slate-700 bg-slate-900 rounded-lg text-sm text-gray-100">
+                        <input type="text" id="adhoc-task-description" placeholder="發生了什麼事？ (例如：處理入庫單號異常)" class="w-full p-2.5 border border-slate-700 bg-slate-900 rounded-lg text-sm text-gray-100 focus:ring-red-500 focus:border-red-500">
                         <button onclick="logAdHocTask()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg shadow-md transition duration-150 text-sm">
                             紀錄 (Log Entry)
                         </button>
@@ -179,50 +186,57 @@
                 </div>
             </div>
 
-            <!-- 右側主面板 -->
+            <!-- 右側主面板：例行任務與時間軸日誌 (佔 8 等份) -->
             <div class="lg:col-span-8 space-y-6">
-                <!-- 任務管理中心 -->
+                
+                 <!-- 整合版任務清單 (Routine Center) -->
                 <div class="card p-6 no-print">
                     <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
                          <h2 class="text-xl font-bold text-cyan-400 flex items-center">
                             <svg class="w-6 h-6 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
                             [TASK CENTER] 任務管理中心
                         </h2>
-                        <button onclick="resetMonthlyStatus()" class="text-xs bg-slate-700 text-emerald-400 hover:text-white hover:bg-emerald-600 px-3 py-1 rounded transition-colors">
+                        <button onclick="resetMonthlyStatus()" class="text-xs bg-slate-700 text-emerald-400 hover:text-white hover:bg-emerald-600 px-3 py-1 rounded transition-colors" title="每月初點擊此處重置每月任務進度">
                             重置每月進度
                         </button>
                     </div>
                    
+                    <!-- 任務列表 -->
                     <div id="routine-tasks-list" class="space-y-3 mb-6 max-h-[500px] overflow-y-auto pr-2">
-                        <!-- 由 JS 載入 -->
+                        <!-- 例行任務將由 JavaScript 載入並以分類收合方式呈現 -->
+                        <div class="text-center py-4 text-gray-500 text-sm bg-slate-700 rounded-lg border border-dashed border-slate-600">
+                            尚無設定任務
+                        </div>
                     </div>
                     
+                    <!-- 管理/新增例行任務區塊 -->
                     <div class="border-t border-slate-700 pt-4">
                         <div class="flex space-x-2 mb-3">
-                            <button onclick="document.getElementById('add-routine-form').classList.toggle('hidden')" class="flex-1 text-sm bg-slate-700 text-gray-200 hover:bg-slate-600 font-medium py-1.5 rounded-lg flex items-center justify-center">
+                            <button onclick="document.getElementById('add-routine-form').classList.toggle('hidden')" class="flex-1 text-sm bg-slate-700 text-gray-200 hover:bg-slate-600 font-medium py-1.5 rounded-lg flex items-center justify-center transition duration-150">
                                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                                 新增任務
                             </button>
-                            <button onclick="importRoutineTasks()" class="w-1/4 text-sm bg-indigo-500 text-white hover:bg-indigo-600 font-medium py-1.5 rounded-lg">匯入</button>
-                            <button onclick="exportRoutineTasks()" class="w-1/4 text-sm bg-indigo-500 text-white hover:bg-indigo-600 font-medium py-1.5 rounded-lg">匯出</button>
+                            <button onclick="importRoutineTasks()" class="w-1/4 text-sm bg-indigo-500 text-white hover:bg-indigo-600 font-medium py-1.5 rounded-lg transition duration-150">匯入</button>
+                            <button onclick="exportRoutineTasks()" class="w-1/4 text-sm bg-indigo-500 text-white hover:bg-indigo-600 font-medium py-1.5 rounded-lg transition duration-150">匯出</button>
                         </div>
                         
                         <div id="add-routine-form" class="mt-3 space-y-2 hidden bg-slate-700 p-4 rounded-lg border border-cyan-400">
+                            <!-- 新增頻率選擇 -->
                             <div class="flex space-x-2">
-                                <select id="new-routine-task-frequency" class="w-1/3 text-sm p-2 border border-slate-600 bg-slate-900 rounded text-gray-100">
+                                <select id="new-routine-task-frequency" class="w-1/3 text-sm p-2 border border-slate-600 bg-slate-900 rounded focus:ring-cyan-500 focus:border-cyan-500 outline-none text-gray-100">
                                     <option value="Daily">每日 (Daily)</option>
                                     <option value="Monthly">每月 (Monthly)</option>
                                 </select>
-                                <input type="text" id="new-routine-task-category" placeholder="類別 (如: ERP, 報表)" class="flex-1 text-sm p-2 border border-slate-600 bg-slate-900 rounded text-gray-100">
+                                <input type="text" id="new-routine-task-category" placeholder="類別 (如: ERP, 報表, 行政)" class="flex-1 text-sm p-2 border border-slate-600 bg-slate-900 rounded focus:ring-cyan-500 focus:border-cyan-500 outline-none text-gray-100 placeholder-gray-500">
                             </div>
-                            <input type="text" id="new-routine-task-name" placeholder="任務名稱" class="w-full text-sm p-2 border border-slate-600 bg-slate-900 rounded text-gray-100">
-                            <input type="text" id="new-routine-task-notes" placeholder="備註 (選填)" class="w-full text-sm p-2 border border-slate-600 bg-slate-900 rounded text-gray-100">
-                            <button onclick="addRoutineTask()" class="w-full bg-cyan-500 text-slate-900 text-sm font-bold py-1.5 rounded hover:bg-cyan-400">儲存任務</button>
+                            <input type="text" id="new-routine-task-name" placeholder="任務名稱 (e.g., 確認GB會科倉)" class="w-full text-sm p-2 border border-slate-600 bg-slate-900 rounded focus:ring-cyan-500 focus:border-cyan-500 outline-none text-gray-100 placeholder-gray-500">
+                            <input type="text" id="new-routine-task-notes" placeholder="備註 (選填, e.g., 24550收料單明細表)" class="w-full text-sm p-2 border border-slate-600 bg-slate-900 rounded focus:ring-cyan-500 focus:border-cyan-500 outline-none text-gray-100 placeholder-gray-500">
+                            <button onclick="addRoutineTask()" class="w-full bg-cyan-500 text-slate-900 text-sm font-bold py-1.5 rounded hover:bg-cyan-400 transition duration-150">儲存任務</button>
                         </div>
                     </div>
                 </div>
 
-                <!-- 時間軸日誌 -->
+                <!-- 時間軸日誌 (核心視覺化區域) -->
                 <div class="card p-6 min-h-[500px]">
                     <div class="flex justify-between items-center mb-6 border-b border-slate-700 pb-2">
                         <h2 class="text-xl font-bold text-cyan-400 flex items-center">
@@ -231,7 +245,14 @@
                         </h2>
                         <span class="text-xs bg-slate-700 text-gray-400 px-3 py-1 rounded-full font-mono" id="log-count-badge">0 ENTRIES</span>
                     </div>
-                    <div id="daily-log-timeline" class="pl-2"></div>
+
+                    <div id="daily-log-timeline" class="pl-2">
+                        <!-- 時間軸內容由 JS 生成 -->
+                         <div class="flex flex-col items-center justify-center h-64 text-gray-600">
+                            <svg class="w-16 h-16 mb-2 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            <p>今日尚無紀錄，開始工作吧！</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -240,66 +261,91 @@
         <div class="mt-8 text-center text-xs text-gray-600 no-print">
             <p>App ID: <span id="app-id-display" class="font-mono"></span> | Data Source: <span id="user-id-display" class="font-mono text-cyan-500"></span></p>
         </div>
+
     </div>
 
-    <!-- 用戶設定模態視窗 (保留功能) -->
+    <!-- 用戶設定與切換模態視窗 -->
     <div id="user-settings-modal" class="modal-overlay hidden" style="z-index: 250;">
         <div class="modal-content p-6 rounded-xl shadow-2xl w-full max-w-md">
             <div class="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
                 <h3 class="text-xl font-bold text-cyan-400 flex items-center">
                     <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                    用戶帳號設定
+                    用戶帳號設定 (跨裝置同步)
                 </h3>
                 <button onclick="closeUserSettingsModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
             </div>
+            
             <div class="space-y-6">
                 <div class="bg-slate-800 p-4 rounded-lg border border-slate-600">
-                    <label class="block text-xs text-gray-500 mb-1 uppercase">當前資料儲存 ID</label>
-                    <span id="modal-current-user-id" class="font-mono text-lg text-green-400 break-all font-bold">--</span>
+                    <label class="block text-xs text-gray-500 mb-1 uppercase tracking-wider">當前資料儲存 ID</label>
+                    <div class="flex items-center justify-between">
+                        <span id="modal-current-user-id" class="font-mono text-lg text-green-400 break-all font-bold">--</span>
+                        <span class="text-xs px-2 py-1 rounded bg-slate-700 text-gray-300 ml-2 whitespace-nowrap">使用中</span>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">注意：匿名登入的 ID 隨機產生，更換電腦會消失。若要跨電腦使用，請設定下方「自訂 ID」。</p>
                 </div>
+
                 <div class="bg-indigo-900/30 p-4 rounded-lg border border-indigo-500/50">
-                    <label class="block text-sm font-bold text-indigo-300 mb-2">設定自訂 ID (跨裝置同步)</label>
+                    <label class="block text-sm font-bold text-indigo-300 mb-2">設定自訂 ID (推薦)</label>
+                    <p class="text-xs text-gray-400 mb-3">設定一個容易記住的名稱 (如: `alex-work`)，在其他電腦輸入相同名稱即可同步資料。</p>
                     <div class="flex space-x-2">
-                        <input type="text" id="custom-user-id-input" placeholder="輸入 ID" class="flex-1 bg-slate-900 border border-indigo-500 text-white text-sm rounded-lg p-2.5">
-                        <button onclick="applyCustomUserId()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg text-sm">切換</button>
+                        <input type="text" id="custom-user-id-input" placeholder="輸入您的自訂 ID" class="flex-1 bg-slate-900 border border-indigo-500 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5">
+                        <button onclick="applyCustomUserId()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors">
+                            切換/載入
+                        </button>
                     </div>
                 </div>
+
                 <div class="text-center pt-2">
-                     <button onclick="resetToSystemId()" class="text-xs text-red-400 hover:text-red-300 underline">重置為系統預設 ID</button>
+                     <button onclick="resetToSystemId()" class="text-xs text-red-400 hover:text-red-300 underline">
+                        重置為系統預設 ID (不推薦)
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 歷史紀錄模態視窗 (保留功能) -->
+    <!-- 歷史紀錄模態視窗 -->
     <div id="history-modal" class="modal-overlay hidden" style="z-index: 150;">
         <div class="modal-content p-0 rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[85vh]">
             <div class="bg-indigo-600 p-4 flex justify-between items-center text-white">
-                <h2 class="text-xl font-bold">歷史紀錄查詢</h2>
-                <button onclick="closeHistoryModal()" class="text-white hover:text-indigo-200 text-2xl font-light">&times;</button>
+                <h2 class="text-xl font-bold flex items-center">
+                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    歷史紀錄查詢
+                </h2>
+                <button onclick="closeHistoryModal()" class="text-white hover:text-indigo-200 text-2xl font-light focus:outline-none">&times;</button>
             </div>
-            <div class="p-6 border-b border-slate-700 bg-slate-700 flex items-center space-x-4">
-                <label for="history-date-picker" class="font-medium text-gray-200">選擇日期:</label>
-                <input type="date" id="history-date-picker" onchange="fetchLogsForDate(this.value)" class="p-2 border border-slate-600 bg-slate-900 rounded-lg text-sm text-gray-100">
+            
+            <div class="p-6 border-b border-slate-700 bg-slate-700">
+                <div class="flex items-center space-x-4">
+                    <label for="history-date-picker" class="font-medium text-gray-200">選擇日期:</label>
+                    <input type="date" id="history-date-picker" onchange="fetchLogsForDate(this.value)" class="p-2 border border-slate-600 bg-slate-900 rounded-lg text-sm text-gray-100 focus:ring-cyan-500 focus:border-cyan-500">
+                </div>
             </div>
+
             <div class="p-6 overflow-y-auto flex-1">
-                 <div id="history-log-entries" class="pl-2"></div>
+                 <div id="history-log-entries" class="pl-2">
+                    <p class="text-gray-500 text-center py-10">請選擇日期以載入資料。</p>
+                </div>
             </div>
         </div>
     </div>
     
-    <!-- 預覽/列印模式 (保留功能) -->
+    <!-- 簡報/列印模式模態視窗 -->
     <div id="print-modal" class="modal-overlay hidden" style="z-index: 200;">
+        <!-- 使用一個淺色模式的容器來確保列印出來是白色背景 -->
         <div class="modal-content bg-white text-gray-900 rounded-lg shadow-2xl w-full max-w-3xl overflow-hidden">
              <div class="flex justify-between items-center p-4 border-b no-print bg-gray-50">
-                <h3 class="font-bold text-gray-700">工作日誌預覽 (Ctrl+P 列印)</h3>
+                <h3 class="font-bold text-gray-700">工作日誌預覽 (按下 Ctrl+P 列印或存為 PDF)</h3>
                 <button onclick="document.getElementById('print-modal').classList.add('hidden')" class="text-gray-500 hover:text-gray-800 text-xl">&times;</button>
             </div>
-            <div class="p-8 print-area" id="print-content" style="background-color: white;"></div>
+            <div class="p-8 print-area" id="print-content" style="background-color: white;">
+                <!-- 內容由 JS 複製 -->
+            </div>
         </div>
     </div>
 
-    <!-- 訊息提示視窗 (保留功能) -->
+    <!-- 訊息提示視窗 -->
     <div id="message-modal" class="modal-overlay hidden" style="z-index: 300;">
         <div class="modal-content p-6 rounded-xl shadow-2xl w-full max-w-sm text-center">
             <div id="modal-icon" class="mb-4"></div>
@@ -309,329 +355,927 @@
         </div>
     </div>
 
+
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, collection, query, where, addDoc, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, query, where, addDoc, getDocs, setLogLevel, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase 偵錯日誌
+        // setLogLevel('Debug');
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
+        // 本機備用配置
         let LOCAL_FIREBASE_CONFIG = {
-            apiKey: "AIzaSyAXnSDK_kY4Aa8XvL0M_Md9kA4Wdow_Uvs", projectId: "daily-23c82",
-            authDomain: "daily-23c82.firebaseapp.com", storageBucket: "daily-23c82.firebasestorage.app",
-            messagingSenderId: "574719251457", appId: "1:574719251457:web:30aadb364406783b175c00"
+            apiKey: "AIzaSyAXnSDK_kY4Aa8XvL0M_Md9kA4Wdow_Uvs",
+            authDomain: "daily-23c82.firebaseapp.com",
+            projectId: "daily-23c82",
+            storageBucket: "daily-23c82.firebasestorage.app",
+            messagingSenderId: "574719251457",
+            appId: "1:574719251457:web:30aadb364406783b175c00",
+            measurementId: "G-6JN0N6BJHH"
         };
 
-        let firebaseConfig = (typeof __firebase_config !== 'undefined' && __firebase_config !== 'null' && __firebase_config.length > 2) 
-            ? JSON.parse(__firebase_config) : LOCAL_FIREBASE_CONFIG; 
+        // Firebase 配置
+        let firebaseConfig = 
+            (typeof __firebase_config !== 'undefined' && __firebase_config !== 'null' && __firebase_config.length > 2) 
+                ? JSON.parse(__firebase_config) 
+                : LOCAL_FIREBASE_CONFIG; 
 
-        let app, db, auth, authUserId = null, dataUserId = null, isAuthReady = false;
-        let routineTasks = [], completedRoutineTaskNames = new Set(), monthlyTaskStatus = {}, dailyLogs = [], statsChart = null;
-        let unsubscribeRoutine = null, unsubscribeLogs = null, unsubscribeMonthlyStatus = null;
+        let app, db, auth;
+        // userId: Firebase Authentication 的真實 UID (用於驗證)
+        let authUserId = null; 
+        // dataUserId: 實際用來存取資料的 ID (可能是 authUserId 或 用戶自訂的 ID)
+        let dataUserId = null;
+        let isAuthReady = false;
+
+        let routineTasks = []; 
+        let completedRoutineTaskNames = new Set(); 
+        
+        // --- 每月任務狀態 ---
+        let monthlyTaskStatus = {}; // 儲存每月任務完成狀態 { taskName: timestamp }
+        
+        let dailyLogs = [];
+        let statsChart = null;
+        
+        // 監聽器取消函數 (用於切換用戶時取消舊的監聽)
+        let unsubscribeRoutine = null;
+        let unsubscribeLogs = null;
+        let unsubscribeMonthlyStatus = null;
+        
         let openCategories = new Set(); 
-
+        
         Chart.defaults.color = '#e2e8f0'; 
         Chart.defaults.font.family = 'Microsoft YaHei, Microsoft JhengHei, Inter, sans-serif'; 
 
-        // --- Core Functions ---
-        const getRoutineTasksDocRef = () => dataUserId ? doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'routine_tasks') : null;
-        const getMonthlyStatusDocRef = () => dataUserId ? doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'monthly_status') : null;
-        const getDailyLogCollectionRef = (dateString = getTodayDateString()) => dataUserId ? collection(db, 'artifacts', appId, 'users', dataUserId, 'daily_logs', dateString, 'entries') : null;
-        const getTodayDateString = () => new Date().toISOString().split('T')[0];
-        const formatDisplayDate = (dateStr) => dateStr.replace(/-/g, '/');
-
-        // --- Edit Tasks & Categories (NEW) ---
-        window.editCategory = (event, oldCategory) => {
-            event.stopPropagation();
-            const newCategory = prompt(`請輸入類別「${oldCategory}」的新名稱:`, oldCategory);
-            if (!newCategory || newCategory.trim() === "" || newCategory === oldCategory) return;
-
-            const updatedTasks = routineTasks.map(task => 
-                task.category === oldCategory ? { ...task, category: newCategory.trim() } : task
-            );
-            
-            if (openCategories.has(oldCategory)) {
-                openCategories.delete(oldCategory);
-                openCategories.add(newCategory.trim());
-            }
-            saveRoutineTasks(updatedTasks);
-        };
-
-        window.editRoutineTask = (taskName) => {
-            const task = routineTasks.find(t => t.name === taskName);
-            if (!task) return;
-
-            const newName = prompt(`編輯任務名稱:`, task.name);
-            if (!newName || newName.trim() === "") return;
-            
-            // 檢查重複 (除非是自己)
-            if (newName !== task.name && routineTasks.some(t => t.name === newName)) {
-                alert("任務名稱已存在");
-                return;
-            }
-
-            const newNotes = prompt(`編輯備註:`, task.notes || "");
-            const newFreq = confirm(`任務頻率是否設為「每月」(Monthly)？\n(取消則設為「每日」Daily)`) ? "Monthly" : "Daily";
-
-            const updatedTasks = routineTasks.map(t => 
-                t.name === taskName ? { ...t, name: newName.trim(), notes: newNotes, frequency: newFreq } : t
-            );
-
-            // 如果改了名字且有每月狀態，遷移狀態
-            if (newName !== taskName && monthlyTaskStatus[taskName]) {
-                const newStatus = { ...monthlyTaskStatus };
-                newStatus[newName] = newStatus[taskName];
-                delete newStatus[taskName];
-                setDoc(getMonthlyStatusDocRef(), newStatus);
-            }
-
-            saveRoutineTasks(updatedTasks);
-        };
-
-        // --- Other Logic ---
+        // --- Chart.js Initialization ---
         const initChart = () => {
-            if (statsChart) statsChart.destroy();
+            if (statsChart) {
+                statsChart.destroy();
+            }
+            
             const ctx = document.getElementById('workChart').getContext('2d');
             statsChart = new Chart(ctx, {
-                type: 'doughnut', data: { labels: ['例行', '臨時'], datasets: [{ data: [0, 0], backgroundColor: ['#60a5fa', '#f87171'], borderWidth: 0 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } }, cutout: '70%' }
+                type: 'doughnut',
+                data: {
+                    labels: ['例行工作 (Routine)', '臨時狀況 (Ad-hoc)'],
+                    datasets: [{
+                        data: [0, 0], 
+                        backgroundColor: ['#60a5fa', '#f87171'], 
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { 
+                            position: 'right', 
+                            labels: { 
+                                usePointStyle: true,
+                                color: '#94a3b8' 
+                            } 
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(30, 41, 59, 0.9)', 
+                            titleColor: '#e2e8f0',
+                            bodyColor: '#e2e8f0',
+                        }
+                    },
+                    cutout: '70%',
+                }
             });
-            updateChart();
+            updateChart(); 
         };
 
         const updateChart = () => {
             if (!statsChart) return;
-            let routine = 0, adhoc = 0;
-            dailyLogs.forEach(l => (l.type === 'Routine' || l.type === 'Monthly') ? routine++ : adhoc++);
-            statsChart.data.datasets[0].data = [routine, adhoc];
+            
+            let routineCount = 0;
+            let adhocCount = 0;
+
+            dailyLogs.forEach(log => {
+                if (log.type === 'Routine' || log.type === 'Monthly') routineCount++; 
+                else adhocCount++;
+            });
+
+            statsChart.data.datasets[0].data = [routineCount, adhocCount];
             statsChart.update();
-            document.getElementById('stat-routine').textContent = routine;
-            document.getElementById('stat-adhoc').textContent = adhoc;
+
+            document.getElementById('stat-routine').textContent = routineCount;
+            document.getElementById('stat-adhoc').textContent = adhocCount;
             document.getElementById('log-count-badge').textContent = `${dailyLogs.length} ENTRIES`;
-            document.getElementById('chart-placeholder').classList.toggle('hidden', routine > 0 || adhoc > 0);
+
+            const placeholder = document.getElementById('chart-placeholder');
+            if (routineCount === 0 && adhocCount === 0) {
+                placeholder.classList.remove('hidden');
+            } else {
+                placeholder.classList.add('hidden');
+            }
         };
+
+        // --- UI Utils ---
+        window.closeMessageModal = () => document.getElementById('message-modal').classList.add('hidden');
+
+        const showMessage = (type, title, body, onConfirm = null) => {
+            const modal = document.getElementById('message-modal');
+            const titleEl = document.getElementById('message-modal-title');
+            const bodyEl = document.getElementById('message-modal-body');
+            const actionsEl = document.getElementById('message-modal-actions');
+            const iconEl = document.getElementById('modal-icon');
+
+            titleEl.textContent = title;
+            bodyEl.textContent = body;
+            actionsEl.innerHTML = '';
+            titleEl.className = 'text-xl font-bold mb-2 ' + (type === 'error' ? 'text-red-400' : type === 'success' ? 'text-green-400' : 'text-cyan-400');
+
+            // Icon Setup
+            let iconColor, iconPath;
+            if (type === 'error') {
+                iconColor = 'text-red-400'; iconPath = 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z';
+            } else if (type === 'confirm' || type === 'warning') {
+                iconColor = 'text-yellow-400'; iconPath = 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z';
+            } else if (type === 'success') {
+                 iconColor = 'text-green-400'; iconPath = 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z';
+            } else {
+                iconColor = 'text-cyan-400'; iconPath = 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z';
+            }
+            iconEl.innerHTML = `<svg class="w-12 h-12 ${iconColor} mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${iconPath}"></path></svg>`;
+
+            if (onConfirm) {
+                const confirmBtn = document.createElement('button');
+                confirmBtn.className = "bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 font-medium";
+                confirmBtn.textContent = "確認";
+                confirmBtn.onclick = () => { window.closeMessageModal(); onConfirm(); };
+                
+                const cancelBtn = document.createElement('button');
+                cancelBtn.className = "bg-slate-700 text-gray-200 px-4 py-2 rounded-lg hover:bg-slate-600 font-medium";
+                cancelBtn.textContent = "取消";
+                cancelBtn.onclick = window.closeMessageModal;
+
+                actionsEl.appendChild(cancelBtn);
+                actionsEl.appendChild(confirmBtn);
+            } else {
+                const okBtn = document.createElement('button');
+                okBtn.className = "bg-cyan-500 text-slate-900 px-6 py-2 rounded-lg hover:bg-cyan-400 font-bold";
+                okBtn.textContent = "OK";
+                okBtn.onclick = window.closeMessageModal;
+                actionsEl.appendChild(okBtn);
+            }
+
+            modal.classList.remove('hidden');
+        };
+
+        window.toggleAccordion = (button, category, contentId, iconId) => {
+            const content = document.getElementById(contentId);
+            const icon = document.getElementById(iconId);
+            
+            if (!content || !icon) return;
+
+            if (content.classList.contains('hidden')) {
+                content.classList.remove('hidden');
+                icon.classList.add('rotate-180');
+                openCategories.add(category);
+            } else {
+                content.classList.add('hidden');
+                icon.classList.remove('rotate-180');
+                openCategories.delete(category);
+            }
+        };
+
+        const getTodayDateString = () => {
+            const date = new Date();
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+        
+        const formatDisplayDate = (dateStr) => {
+            const d = new Date(dateStr);
+            return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+        };
+
+        // Firestore 路徑定義 - 關鍵修改：使用 dataUserId 而非 authUserId
+        const getRoutineTasksDocRef = () => dataUserId ? doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'routine_tasks') : null;
+        
+        // 每月任務狀態的路徑 (保留以追蹤完成狀態)
+        const getMonthlyStatusDocRef = () => dataUserId ? doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'monthly_status') : null;
+
+        const getDailyLogCollectionRef = (dateString = getTodayDateString()) => dataUserId ? collection(db, 'artifacts', appId, 'users', dataUserId, 'daily_logs', dateString, 'entries') : null;
+
+        // --- User ID Management ---
+        const determineDataUserId = (authenticatedUid) => {
+            // 檢查 LocalStorage 是否有使用者自訂的 ID
+            const storedCustomId = localStorage.getItem('custom_user_id');
+            if (storedCustomId) {
+                return storedCustomId;
+            }
+            return authenticatedUid;
+        };
+
+        window.showUserSettingsModal = () => {
+            document.getElementById('modal-current-user-id').textContent = dataUserId || '尚未連線';
+            document.getElementById('custom-user-id-input').value = localStorage.getItem('custom_user_id') || '';
+            document.getElementById('user-settings-modal').classList.remove('hidden');
+        };
+
+        window.closeUserSettingsModal = () => {
+            document.getElementById('user-settings-modal').classList.add('hidden');
+        };
+
+        window.applyCustomUserId = () => {
+            const input = document.getElementById('custom-user-id-input').value.trim();
+            if (!input) {
+                showMessage('error', '錯誤', 'ID 不能為空');
+                return;
+            }
+            // 簡單的格式驗證
+            if (/[^a-zA-Z0-9\-_]/.test(input)) {
+                showMessage('error', '格式錯誤', 'ID 只能包含英文字母、數字、減號(-)與底線(_)');
+                return;
+            }
+
+            showMessage('confirm', '切換帳號', `確定要切換到 ID: ${input} 嗎？`, () => {
+                localStorage.setItem('custom_user_id', input);
+                window.location.reload(); // 重新整理最乾脆，確保所有狀態重置
+            });
+        };
+
+        window.resetToSystemId = () => {
+             showMessage('warning', '重置確認', `確定要移除自訂 ID 並恢復為系統預設值嗎？您可能會看不到目前的資料。`, () => {
+                localStorage.removeItem('custom_user_id');
+                window.location.reload();
+            });
+        };
+
+        // --- Firebase Core ---
+        const initFirebase = async () => {
+            document.getElementById('header-date').textContent = formatDisplayDate(getTodayDateString());
+            document.getElementById('app-id-display').textContent = appId;
+            document.getElementById('history-date-picker').max = getTodayDateString();
+
+            if (!firebaseConfig?.apiKey) {
+                document.getElementById('loading-overlay').innerHTML = `<p class="text-red-400 font-bold text-xl">設定錯誤：缺少 Firebase API Key</p>`;
+                return;
+            }
+
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                await setPersistence(auth, browserSessionPersistence);
+
+                if (initialAuthToken) await signInWithCustomToken(auth, initialAuthToken);
+                else await signInAnonymously(auth);
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        authUserId = user.uid; // 這是 Firebase 認證的 UID
+                        isAuthReady = true;
+
+                        // 決定要讀取資料的 ID (自訂 ID 優先)
+                        dataUserId = determineDataUserId(authUserId);
+                        
+                        // 顯示目前使用的 Data Source ID
+                        const displayEl = document.getElementById('user-id-display');
+                        displayEl.textContent = dataUserId;
+                        // 如果是自訂 ID，加個標記
+                        if (dataUserId !== authUserId) {
+                             displayEl.textContent += " (Custom)";
+                             displayEl.classList.add("text-yellow-400");
+                        }
+                        
+                        initChart(); 
+                        loadRoutineTasks();
+                        loadMonthlyStatus(); // 載入每月任務狀態
+                        subscribeToDailyLogs();
+                        
+                        // UI Transition
+                        document.getElementById('loading-overlay').classList.add('opacity-0');
+                        setTimeout(() => {
+                            document.getElementById('loading-overlay').style.display = 'none';
+                            document.getElementById('app-container').style.display = 'block';
+                        }, 300);
+                        
+                        // 如果是第一次匿名登入且沒有設定自訂 ID，提示用戶
+                        if (dataUserId === authUserId && !localStorage.getItem('seen_user_tip')) {
+                             localStorage.setItem('seen_user_tip', 'true');
+                        }
+
+                    } else {
+                        document.getElementById('loading-overlay').innerHTML = `<p class="text-red-400">登入失敗，無法載入資料</p>`;
+                    }
+                });
+            } catch (error) {
+                console.error("Init Error:", error);
+                document.getElementById('loading-overlay').innerHTML = `<p class="text-red-400">系統初始化失敗: ${error.message}</p>`;
+            }
+        };
+
+        // --- Logic: Routine Tasks (Integrated) ---
+        const loadRoutineTasks = () => {
+            if (!isAuthReady || !dataUserId) return;
+            
+            if (unsubscribeRoutine) unsubscribeRoutine(); // 取消舊的監聽
+
+            unsubscribeRoutine = onSnapshot(getRoutineTasksDocRef(), (docSnap) => {
+                if (docSnap.exists() && Array.isArray(docSnap.data().tasks)) {
+                    routineTasks = docSnap.data().tasks.map(task => ({
+                        // Ensure required fields exist
+                        name: task.name || '無名稱任務', 
+                        category: task.category || '未分類', 
+                        notes: task.notes || '',
+                        frequency: task.frequency || 'Daily' // Default to Daily for legacy data
+                    }));
+                } else {
+                    routineTasks = [];
+                }
+                renderRoutineTasks(); 
+            }, (error) => {
+                console.error("Error loading routine tasks:", error);
+                if (error.code === 'permission-denied') {
+                     showMessage('error', '權限錯誤', '無法讀取資料。請確認您使用的自訂 ID 正確，或嘗試重置 ID。');
+                }
+            });
+        };
+        
+        // 載入每月任務狀態
+        const loadMonthlyStatus = () => {
+            if (!isAuthReady || !dataUserId) return;
+            if (unsubscribeMonthlyStatus) unsubscribeMonthlyStatus();
+
+            unsubscribeMonthlyStatus = onSnapshot(getMonthlyStatusDocRef(), (docSnap) => {
+                if (docSnap.exists()) {
+                    monthlyTaskStatus = docSnap.data();
+                } else {
+                    monthlyTaskStatus = {};
+                }
+                renderRoutineTasks(); // 狀態改變時重繪
+            });
+        };
+
+
+        const saveRoutineTasks = async (tasks) => {
+            if (!isAuthReady || !dataUserId) {
+                 showMessage('error', '驗證錯誤', '尚未連線，請稍候再試。');
+                 return;
+            }
+            try {
+                await setDoc(getRoutineTasksDocRef(), { tasks });
+            } catch (e) {
+                console.error("Save Routine Task Error:", e);
+                showMessage('error', '儲存失敗', `無法更新任務清單。錯誤: ${e.message}`);
+            }
+        };
+        
+        // 更新每月任務狀態
+        const updateMonthlyTaskStatus = async (taskName, isCompleted) => {
+             if (!isAuthReady || !dataUserId) return;
+             try {
+                 const newStatus = { ...monthlyTaskStatus };
+                 if (isCompleted) {
+                     newStatus[taskName] = Date.now(); // 紀錄完成時間戳
+                 } else {
+                     delete newStatus[taskName]; // 移除代表未完成
+                 }
+                 await setDoc(getMonthlyStatusDocRef(), newStatus);
+             } catch(e) {
+                 console.error(e);
+             }
+        };
+        
+        // 重置每月任務狀態
+        window.resetMonthlyStatus = () => {
+             showMessage('confirm', '重置確認', '確定要將所有「每月任務」重置為未完成狀態嗎？(建議於月初執行)', async () => {
+                 try {
+                     await setDoc(getMonthlyStatusDocRef(), {});
+                     showMessage('success', '重置完成', '所有每月任務進度已重置。');
+                 } catch(e) {
+                     showMessage('error', '錯誤', e.message);
+                 }
+             });
+        };
+
+        window.addRoutineTask = async () => {
+            const frequency = document.getElementById('new-routine-task-frequency').value;
+            const category = document.getElementById('new-routine-task-category').value.trim() || '未分類';
+            const name = document.getElementById('new-routine-task-name').value.trim();
+            const notes = document.getElementById('new-routine-task-notes').value.trim();
+            
+            if (!isAuthReady || !dataUserId) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
+            if (!name) return showMessage('error', '錯誤', '任務名稱不可為空');
+            
+            if (routineTasks.some(t => t.name === name)) return showMessage('error', '重複', '任務名稱已存在');
+
+            await saveRoutineTasks([...routineTasks, { name, category, notes, frequency }]);
+            document.getElementById('new-routine-task-category').value = '';
+            document.getElementById('new-routine-task-name').value = '';
+            document.getElementById('new-routine-task-notes').value = '';
+        };
+
+        window.deleteRoutineTaskByName = (taskName) => {
+            if (!isAuthReady || !dataUserId) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
+            const taskIndex = routineTasks.findIndex(t => t.name === taskName);
+            if (taskIndex === -1) return;
+            const task = routineTasks[taskIndex];
+            
+            showMessage('confirm', '刪除確認', `確定要永久刪除任務「${task.name}」嗎？這將同時刪除今日相關日誌。`, async () => {
+                try {
+                    const logsToDelete = dailyLogs.filter(l => (l.type === 'Routine' || l.type === 'Monthly') && l.taskName === task.name);
+                    for (const log of logsToDelete) {
+                        await deleteDoc(doc(getDailyLogCollectionRef(), log.id));
+                    }
+                    // 如果是每月任務，也要清除狀態
+                    if (task.frequency === 'Monthly') {
+                        await updateMonthlyTaskStatus(taskName, false);
+                    }
+                    const newTasks = routineTasks.filter(t => t.name !== task.name);
+                    await saveRoutineTasks(newTasks);
+                } catch (e) {
+                    console.error("Delete Routine Task Error:", e);
+                    showMessage('error', '刪除失敗', `無法刪除任務或相關日誌。錯誤: ${e.message}`);
+                }
+            });
+        };
+        
+        // --- Import/Export Logic ---
+        window.exportRoutineTasks = () => {
+            if (routineTasks.length === 0) {
+                return showMessage('info', '無資料', '任務清單為空，無需匯出。');
+            }
+            try {
+                const json = JSON.stringify(routineTasks, null, 2);
+                const blob = new Blob([json], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `routine_tasks_export_${getTodayDateString()}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showMessage('success', '匯出成功', '任務清單已匯出為 JSON 文件。');
+            } catch (e) {
+                showMessage('error', '匯出失敗', '匯出過程中發生錯誤。');
+            }
+        };
+
+        window.importRoutineTasks = () => {
+            if (!isAuthReady || !dataUserId) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = 'application/json';
+            fileInput.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = async (event) => {
+                    try {
+                        const importedData = JSON.parse(event.target.result);
+                        if (!Array.isArray(importedData) || importedData.some(item => typeof item.name !== 'string')) {
+                            throw new Error('JSON 格式不正確，應為包含 {name, category, notes, frequency} 的任務陣列。');
+                        }
+                        
+                        const newTasksMap = new Map();
+                        routineTasks.forEach(task => newTasksMap.set(task.name, task));
+                        
+                        let uniqueCount = 0;
+                        importedData.forEach(task => {
+                            if (!task.name || typeof task.name !== 'string' || task.name.trim() === '') {
+                                console.warn("Skipping imported task with invalid name:", task);
+                                return;
+                            }
+                            
+                            const validTask = {
+                                category: task.category || '未分類',
+                                name: task.name.trim(),
+                                notes: task.notes || '',
+                                frequency: task.frequency || 'Daily'
+                            };
+                            if (!newTasksMap.has(validTask.name)) {
+                                newTasksMap.set(validTask.name, validTask);
+                                uniqueCount++;
+                            }
+                        });
+
+                        const newRoutineTasks = Array.from(newTasksMap.values());
+                        
+                        await saveRoutineTasks(newRoutineTasks);
+                        showMessage('success', '匯入成功', `成功匯入 ${uniqueCount} 筆新任務。`);
+
+                    } catch (error) {
+                        showMessage('error', '匯入失敗', `檔案解析錯誤或格式不符: ${error.message}`);
+                    }
+                };
+                reader.readAsText(file);
+            };
+            fileInput.click();
+        };
+
+        // --- Logic: Logs ---
+        const subscribeToDailyLogs = () => {
+            if (!isAuthReady || !dataUserId) return;
+            
+            if (unsubscribeLogs) unsubscribeLogs(); // 取消舊的監聽
+
+            unsubscribeLogs = onSnapshot(getDailyLogCollectionRef(), (snapshot) => {
+                dailyLogs = [];
+                completedRoutineTaskNames.clear();
+                
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    dailyLogs.push({ id: doc.id, ...data });
+                    if ((data.type === 'Routine' || data.type === 'Monthly') && data.taskName) {
+                        completedRoutineTaskNames.add(data.taskName);
+                    }
+                });
+                
+                dailyLogs.sort((a, b) => b.timestamp - a.timestamp); 
+                
+                renderTimeline(dailyLogs, document.getElementById('daily-log-timeline'));
+                renderRoutineTasks(); 
+                updateChart(); 
+            }, (error) => {
+                console.error("Error subscribing to daily logs:", error);
+            });
+        };
+
+        window.addLogEntry = async (type, description, taskName = null, category = '一般') => {
+            if (!description) return false;
+            if (!isAuthReady || !dataUserId) {
+                 showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，無法寫入日誌。');
+                 return false;
+            }
+            try {
+                await addDoc(getDailyLogCollectionRef(), {
+                    type, description, taskName, category,
+                    timestamp: Date.now(),
+                    timeString: new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                });
+                return true;
+            } catch (e) {
+                console.error("Log Entry Write Error:", e);
+                showMessage('error', '寫入失敗', `無法新增日誌。錯誤: ${e.message}`);
+                return false;
+            }
+        };
+
+        window.logAdHocTask = async () => {
+            const descInput = document.getElementById('adhoc-task-description');
+            const catInput = document.getElementById('adhoc-category');
+            if (!descInput.value.trim()) return showMessage('error', '空值', '請輸入描述');
+            
+            const success = await window.addLogEntry('AdHoc', descInput.value.trim(), null, catInput.value);
+            if (success) {
+                descInput.value = '';
+            }
+        };
+
+        window.deleteDailyLog = (id, dateStr) => {
+            if (!isAuthReady || !dataUserId) return showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，請稍候再試。');
+            
+            showMessage('confirm', '刪除日誌', '確定要刪除這筆紀錄嗎？若是例行任務將會變回未完成狀態。', async () => {
+                try {
+                    await deleteDoc(doc(getDailyLogCollectionRef(dateStr), id));
+                    if (dateStr !== getTodayDateString()) fetchLogsForDate(dateStr); 
+                } catch (e) {
+                    console.error("Delete Log Error:", e);
+                    showMessage('error', '刪除失敗', `無法刪除日誌。錯誤: ${e.message}`);
+                }
+            });
+        };
+
+        // --- UI Rendering ---
 
         const renderRoutineTasks = () => {
             const list = document.getElementById('routine-tasks-list');
             list.innerHTML = '';
+            
             if (routineTasks.length === 0) {
-                list.innerHTML = `<div class="text-center py-4 text-gray-500 text-sm bg-slate-700 rounded-lg">尚無任務</div>`;
+                list.innerHTML = `<div class="text-center py-4 text-gray-500 text-sm bg-slate-700 rounded-lg border border-dashed border-slate-600">尚無設定任務</div>`;
                 return;
             }
 
             const tasksByCategory = routineTasks.reduce((acc, task) => {
-                const cat = task.category || '未分類';
-                if (!acc[cat]) acc[cat] = [];
-                acc[cat].push(task);
+                const category = task.category || '未分類';
+                if (!acc[category]) {
+                    acc[category] = [];
+                }
+                acc[category].push(task);
                 return acc;
             }, {});
 
-            Object.entries(tasksByCategory).forEach(([category, tasks], idx) => {
-                let done = 0;
-                tasks.forEach(t => (t.frequency === 'Monthly' ? monthlyTaskStatus[t.name] : completedRoutineTaskNames.has(t.name)) ? done++ : null);
-                const percent = Math.round((done / tasks.length) * 100);
-                const isOpened = openCategories.has(category);
-                const cId = `c-${idx}`, iId = `i-${idx}`;
+            let categoryIndex = 0; 
 
-                const catDiv = document.createElement('div');
-                catDiv.className = "relative mb-2";
-                catDiv.innerHTML = `
-                    <button onclick="toggleAccordion(this, '${category}', '${cId}', '${iId}')" class="relative flex items-center justify-between w-full p-3 text-base font-semibold rounded-lg border border-slate-700 overflow-hidden">
-                        <div class="absolute inset-0 bg-cyan-600/30" style="width: ${percent}%;"></div>
-                        <div class="relative z-20 flex items-center">
-                            <span class="truncate">${category}</span>
-                            <span onclick="editCategory(event, '${category}')" class="ml-2 p-1 hover:text-cyan-300 no-print" title="編輯類別名稱">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+            Object.entries(tasksByCategory).forEach(([category, tasks]) => {
+                // 計算完成度
+                let completedCount = 0;
+                tasks.forEach(task => {
+                    const isMonthly = task.frequency === 'Monthly';
+                    if (isMonthly) {
+                        if (monthlyTaskStatus[task.name]) completedCount++;
+                    } else {
+                        if (completedRoutineTaskNames.has(task.name)) completedCount++;
+                    }
+                });
+
+                const totalTasksCount = tasks.length;
+                const progressPercent = totalTasksCount > 0 ? Math.round((completedCount / totalTasksCount) * 100) : 0;
+                const isAllDone = completedCount === totalTasksCount;
+                
+                const isOpened = openCategories.has(category);
+                
+                const uniqueIdSuffix = `cat-${categoryIndex++}`;
+                const contentId = `content-${uniqueIdSuffix}`;
+                const iconId = `icon-${uniqueIdSuffix}`;
+
+                const headerBaseClass = 'relative z-10 flex items-center justify-between w-full p-3 text-base font-semibold text-left rounded-lg transition-colors duration-150 border overflow-hidden';
+                const headerStyleClass = isAllDone ? 'border-blue-500 hover:border-blue-400' : 'border-slate-700 hover:border-cyan-400';
+                const progressColor = isAllDone ? 'bg-blue-600/70' : 'bg-cyan-600/70';
+                
+                const categoryHeader = document.createElement('div');
+                categoryHeader.className = "relative mb-2";
+
+                // 修改這部分：在類別名稱旁新增「編輯類別」按鈕
+                categoryHeader.innerHTML = `
+                    <button onclick="toggleAccordion(this, '${category}', '${contentId}', '${iconId}')" class="${headerBaseClass} ${headerStyleClass}">
+                        <div class="absolute inset-0 h-full transition-all duration-300 pointer-events-none" style="width: ${progressPercent}%;">
+                            <div class="h-full ${progressColor}"></div>
+                        </div>
+                        <div class="relative z-20 flex items-center truncate">
+                            <span class="text-gray-100">${category}</span>
+                            <span onclick="editCategoryName(event, '${category}')" class="ml-2 p-1 text-gray-400 hover:text-white no-print" title="編輯類別名稱">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                             </span>
                         </div>
-                        <div class="relative z-20 flex items-center space-x-2 text-sm">
-                            <span>${percent}% (${done}/${tasks.length})</span>
-                            <svg id="${iId}" class="w-4 h-4 transform ${isOpened ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"></path></svg>
+                        <div class="relative z-20 flex items-center space-x-2">
+                             <span class="text-sm font-bold ${isAllDone ? 'text-blue-200' : 'text-cyan-200'}">${progressPercent}%</span>
+                             <span class="text-sm font-medium ${isAllDone ? 'text-blue-100' : 'text-gray-300'}">(${completedCount}/${totalTasksCount})</span>
+                             <svg id="${iconId}" class="w-4 h-4 transform transition-transform duration-300 ${isOpened ? 'rotate-180' : 'rotate-0'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                         </div>
                     </button>
-                    <div id="${cId}" class="space-y-1 p-3 bg-slate-800 border border-t-0 border-slate-700 rounded-b-lg ${isOpened ? '' : 'hidden'}"></div>
+                    <div id="${contentId}" class="space-y-1 p-3 bg-slate-800 border border-slate-700 rounded-b-lg ${isOpened ? '' : 'hidden'}">
+                    </div>
                 `;
-                list.appendChild(catDiv);
-                const taskContainer = catDiv.querySelector(`#${cId}`);
+                list.appendChild(categoryHeader);
 
-                tasks.forEach(task => {
-                    const isM = task.frequency === 'Monthly';
-                    const isDone = isM ? !!monthlyTaskStatus[task.name] : completedRoutineTaskNames.has(task.name);
+                const taskListContainer = categoryHeader.querySelector('div.space-y-1');
+
+                tasks.forEach((task) => {
+                    const isMonthly = task.frequency === 'Monthly';
+                    const isDone = isMonthly ? !!monthlyTaskStatus[task.name] : completedRoutineTaskNames.has(task.name);
+                    
+                    const activeColorClass = isMonthly 
+                        ? (isDone ? 'border-emerald-600 bg-emerald-900/20 opacity-70' : 'border-slate-700 hover:border-emerald-500 bg-slate-700/50')
+                        : (isDone ? 'border-blue-700 bg-blue-900/20 opacity-70' : 'border-slate-700 hover:border-cyan-400 bg-slate-700/50');
+                    
+                    const checkColorClass = isMonthly ? 'checked:bg-emerald-500 checked:border-emerald-500' : 'checked:bg-cyan-500 checked:border-cyan-500';
+
                     const taskEl = document.createElement('div');
-                    taskEl.className = `flex items-center justify-between p-2.5 rounded-lg border-2 ${isDone ? 'border-slate-800 opacity-60' : 'border-slate-700 bg-slate-700/30'}`;
+                    taskEl.className = `flex items-center justify-between p-3 rounded-lg border-2 transition-all duration-200 ${activeColorClass}`;
+                    
+                    const freqBadge = isMonthly 
+                        ? `<span class="text-[10px] bg-emerald-700 text-white px-1.5 py-0.5 rounded ml-2 font-mono">月</span>`
+                        : `<span class="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded ml-2 font-mono">日</span>`;
+
+                    // 修改這部分：在刪除按鈕旁新增「編輯任務」按鈕
                     taskEl.innerHTML = `
                         <div class="flex items-center space-x-3 flex-1 overflow-hidden">
-                            <input type="checkbox" id="t-${task.name}" class="h-5 w-5 rounded bg-slate-900 border-slate-500 checked:bg-cyan-500" ${isDone ? 'checked disabled' : ''}>
-                            <label for="t-${task.name}" class="truncate text-sm font-medium ${isDone ? 'line-through text-gray-500' : ''}">
-                                ${task.name} <span class="text-[10px] px-1 rounded ${isM ? 'bg-emerald-700' : 'bg-blue-600'}">${isM ? '月' : '日'}</span>
-                                <span class="text-xs text-gray-500 ml-1">${task.notes || ''}</span>
+                            <div class="relative flex items-center shrink-0">
+                                <input type="checkbox" id="task-${task.name}" data-task-name="${task.name}" class="peer h-6 w-6 cursor-pointer appearance-none rounded-md border-2 border-slate-500 shadow-sm ${checkColorClass} bg-slate-900 transition-colors duration-200" ${isDone ? 'checked disabled' : ''}>
+                                <svg class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none opacity-0 peer-checked:opacity-100 text-slate-900 transition-opacity duration-200" viewBox="0 0 14 10" fill="none"><path d="M1 5L4.5 8.5L13 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </div>
+                            <label for="task-${task.name}" class="truncate text-base font-medium ${isDone ? 'text-gray-500 line-through' : 'text-gray-100'} cursor-pointer select-none flex items-center">
+                                ${task.name}
+                                ${freqBadge}
+                                ${task.notes ? `<span class="ml-2 text-xs text-gray-400 font-normal">(${task.notes})</span>` : ''}
                             </label>
                         </div>
-                        <div class="flex items-center space-x-1 no-print">
-                            <button onclick="editRoutineTask('${task.name}')" class="p-1 text-gray-500 hover:text-cyan-400" title="編輯任務">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                        <div class="flex items-center space-x-2 no-print">
+                            <button onclick="editTaskDetails('${task.name}')" class="text-gray-400 hover:text-cyan-400 p-1" title="編輯任務內容">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                             </button>
-                            ${!isDone ? `<button onclick="deleteRoutineTaskByName('${task.name}')" class="p-1 text-gray-500 hover:text-red-500"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg></button>` : ''}
+                            ${!isDone ? `<button onclick="deleteRoutineTaskByName('${task.name}')" class="text-gray-600 hover:text-red-500 p-1" title="刪除任務"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>` : ''}
                         </div>
                     `;
+
                     if (!isDone) {
-                        taskEl.querySelector('input').onchange = async (e) => {
-                            e.target.disabled = true;
-                            if (isM) await updateMonthlyTaskStatus(task.name, true);
-                            await window.addLogEntry(isM ? 'Monthly' : 'Routine', `完成: ${task.name}`, task.name, category);
-                        };
+                        taskEl.querySelector('input').addEventListener('change', async (e) => {
+                             e.target.disabled = true;
+                             // 如果是每月任務，更新永久狀態
+                             if (isMonthly) {
+                                 await updateMonthlyTaskStatus(task.name, true);
+                             }
+                             // 統一寫入日誌
+                             const logType = isMonthly ? 'Monthly' : 'Routine';
+                             const success = await window.addLogEntry(logType, `完成: ${task.name} (${category})`, task.name, category);
+                             
+                             if (!success) { 
+                                 e.target.disabled = false; 
+                                 e.target.checked = false; 
+                             }
+                        });
                     }
-                    taskContainer.appendChild(taskEl);
+                    taskListContainer.appendChild(taskEl);
                 });
             });
         };
 
-        // --- Standard Logic & UI (Unchanged) ---
-        window.toggleAccordion = (btn, cat, cId, iId) => {
-            const content = document.getElementById(cId), icon = document.getElementById(iId);
-            content.classList.toggle('hidden'); icon.classList.toggle('rotate-180');
-            content.classList.contains('hidden') ? openCategories.delete(cat) : openCategories.add(cat);
-        };
-        const showMessage = (type, title, body, onConfirm = null) => {
-            const m = document.getElementById('message-modal'), t = document.getElementById('message-modal-title'), b = document.getElementById('message-modal-body'), a = document.getElementById('message-modal-actions'), i = document.getElementById('modal-icon');
-            t.textContent = title; b.textContent = body; a.innerHTML = '';
-            const ok = document.createElement('button'); ok.className = "bg-cyan-500 text-slate-900 px-6 py-2 rounded-lg font-bold"; ok.textContent = "OK"; ok.onclick = () => m.classList.add('hidden');
-            if (onConfirm) {
-                const conf = document.createElement('button'); conf.className = "bg-red-600 text-white px-4 py-2 rounded-lg font-medium"; conf.textContent = "確認"; conf.onclick = () => { m.classList.add('hidden'); onConfirm(); };
-                a.appendChild(ok); a.appendChild(conf); ok.textContent = "取消";
-            } else a.appendChild(ok);
-            m.classList.remove('hidden');
-        };
-        const initFirebase = async () => {
-            document.getElementById('header-date').textContent = formatDisplayDate(getTodayDateString());
-            document.getElementById('app-id-display').textContent = appId;
-            try {
-                app = initializeApp(firebaseConfig); db = getFirestore(app); auth = getAuth(app);
-                await setPersistence(auth, browserSessionPersistence);
-                if (initialAuthToken) await signInWithCustomToken(auth, initialAuthToken); else await signInAnonymously(auth);
-                onAuthStateChanged(auth, user => {
-                    if (user) {
-                        authUserId = user.uid; dataUserId = localStorage.getItem('custom_user_id') || authUserId;
-                        document.getElementById('user-id-display').textContent = dataUserId + (dataUserId !== authUserId ? " (Custom)" : "");
-                        isAuthReady = true; initChart(); loadRoutineTasks(); loadMonthlyStatus(); subscribeToDailyLogs();
-                        document.getElementById('loading-overlay').style.display = 'none'; document.getElementById('app-container').style.display = 'block';
-                    }
-                });
-            } catch (e) { document.getElementById('loading-overlay').innerHTML = `失敗: ${e.message}`; }
-        };
-        const loadRoutineTasks = () => {
-            if (unsubscribeRoutine) unsubscribeRoutine();
-            unsubscribeRoutine = onSnapshot(getRoutineTasksDocRef(), snap => {
-                routineTasks = snap.exists() ? snap.data().tasks : []; renderRoutineTasks();
-            });
-        };
-        const loadMonthlyStatus = () => {
-            if (unsubscribeMonthlyStatus) unsubscribeMonthlyStatus();
-            unsubscribeMonthlyStatus = onSnapshot(getMonthlyStatusDocRef(), snap => {
-                monthlyTaskStatus = snap.exists() ? snap.data() : {}; renderRoutineTasks();
-            });
-        };
-        const subscribeToDailyLogs = () => {
-            if (unsubscribeLogs) unsubscribeLogs();
-            unsubscribeLogs = onSnapshot(getDailyLogCollectionRef(), snap => {
-                dailyLogs = []; completedRoutineTaskNames.clear();
-                snap.forEach(d => {
-                    const data = d.data(); dailyLogs.push({ id: d.id, ...data });
-                    if ((data.type === 'Routine' || data.type === 'Monthly') && data.taskName) completedRoutineTaskNames.add(data.taskName);
-                });
-                dailyLogs.sort((a,b) => b.timestamp - a.timestamp); renderTimeline(dailyLogs, document.getElementById('daily-log-timeline')); updateChart();
-            });
-        };
-        const saveRoutineTasks = async (tasks) => await setDoc(getRoutineTasksDocRef(), { tasks });
-        const updateMonthlyTaskStatus = async (name, done) => {
-            const s = { ...monthlyTaskStatus }; done ? s[name] = Date.now() : delete s[name];
-            await setDoc(getMonthlyStatusDocRef(), s);
-        };
-        window.addRoutineTask = async () => {
-            const f = document.getElementById('new-routine-task-frequency').value, c = document.getElementById('new-routine-task-category').value.trim() || '未分類', n = document.getElementById('new-routine-task-name').value.trim(), no = document.getElementById('new-routine-task-notes').value.trim();
-            if (!n) return alert("名稱必填"); if (routineTasks.some(t => t.name === n)) return alert("重複了");
-            await saveRoutineTasks([...routineTasks, { name: n, category: c, notes: no, frequency: f }]);
-            document.getElementById('new-routine-task-name').value = '';
-        };
-        window.deleteRoutineTaskByName = (name) => {
-            if (confirm(`確定刪除「${name}」？`)) saveRoutineTasks(routineTasks.filter(t => t.name !== name));
-        };
-        window.addLogEntry = async (type, description, taskName = null, category = '一般') => {
-            await addDoc(getDailyLogCollectionRef(), { type, description, taskName, category, timestamp: Date.now(), timeString: new Date().toLocaleTimeString('zh-TW') });
-            return true;
-        };
-        window.logAdHocTask = async () => {
-            const d = document.getElementById('adhoc-task-description'), c = document.getElementById('adhoc-category');
-            if (d.value.trim() && await window.addLogEntry('AdHoc', d.value.trim(), null, c.value)) d.value = '';
-        };
-        const renderTimeline = (logs, container, isH = false, dStr = getTodayDateString()) => {
+        const renderTimeline = (logs, container, isHistory = false, dateStr = getTodayDateString()) => {
             container.innerHTML = '';
-            if (logs.length === 0) { container.innerHTML = `<p class="text-center py-10 text-gray-600">查無紀錄</p>`; return; }
-            logs.forEach(l => {
-                const isR = l.type === 'Routine' || l.type === 'Monthly', isM = l.type === 'Monthly';
-                const item = document.createElement('div'); item.className = 'timeline-item';
-                item.innerHTML = `
-                    <div class="timeline-dot ${isM ? 'bg-emerald-500' : isR ? 'bg-blue-500' : 'bg-red-500'}"></div>
-                    <div class="card p-4">
+            if (logs.length === 0) {
+                container.innerHTML = `<div class="flex flex-col items-center justify-center h-64 text-gray-600"><svg class="w-16 h-16 mb-2 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg><p>${isHistory ? `日期 ${formatDisplayDate(dateStr)} 查無紀錄。` : '今日尚無紀錄，開始工作吧！'}</p></div>`;
+                return;
+            }
+
+            logs.forEach(log => {
+                const isRoutine = log.type === 'Routine' || log.type === 'Monthly';
+                // [NEW] 如果是 Monthly 使用綠色 Icon
+                const isMonthly = log.type === 'Monthly';
+                
+                let iconColor = isMonthly ? 'text-emerald-400' : (isRoutine ? 'text-blue-400' : 'text-red-400');
+                let dotClass = isMonthly ? 'bg-emerald-500 border-emerald-700' : (isRoutine ? 'bg-blue-500 border-blue-700' : 'bg-red-500 border-red-700');
+                
+                const icon = isRoutine 
+                    ? `<svg class="w-4 h-4 ${iconColor}" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>`
+                    : `<svg class="w-4 h-4 ${iconColor}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+                
+                const logItem = document.createElement('div');
+                logItem.className = 'timeline-item';
+                logItem.innerHTML = `
+                    <div class="timeline-dot ${dotClass}"></div>
+                    <div class="card p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300">
                         <div class="flex justify-between items-start">
                             <div class="flex-1">
-                                <p class="text-sm font-bold text-gray-100">${l.description}</p>
-                                <p class="text-xs text-gray-500">[${l.type}] ${l.category}</p>
+                                <p class="text-sm font-bold text-gray-100 flex items-center mb-1">
+                                    ${icon}
+                                    <span class="ml-2">${log.description}</span>
+                                </p>
+                                <p class="text-xs text-gray-400 font-mono">
+                                    [${log.type}] ${log.category}
+                                </p>
                             </div>
-                            <div class="flex items-center space-x-2">
-                                <span class="text-xs font-mono text-cyan-400">${l.timeString}</span>
-                                <button onclick="deleteLog('${l.id}', '${dStr}')" class="text-gray-600 hover:text-red-500 no-print">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            <div class="flex items-center space-x-3 shrink-0">
+                                <span class="text-sm font-mono text-cyan-400">${log.timeString}</span>
+                                <button onclick="deleteDailyLog('${log.id}', '${dateStr}')" class="text-gray-500 hover:text-red-500 no-print" title="刪除日誌">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                 </button>
                             </div>
                         </div>
-                    </div>`;
-                container.appendChild(item);
+                    </div>
+                `;
+                container.appendChild(logItem);
             });
         };
-        window.deleteLog = async (id, dStr) => { if (confirm("確定刪除？")) await deleteDoc(doc(getDailyLogCollectionRef(dStr), id)); };
-        window.showUserSettingsModal = () => {
-            document.getElementById('modal-current-user-id').textContent = dataUserId;
-            document.getElementById('custom-user-id-input').value = localStorage.getItem('custom_user_id') || '';
-            document.getElementById('user-settings-modal').classList.remove('hidden');
+
+        window.showHistoryModal = () => {
+            document.getElementById('history-modal').classList.remove('hidden');
+            const today = getTodayDateString();
+            document.getElementById('history-date-picker').value = today;
+            fetchLogsForDate(today);
         };
-        window.closeUserSettingsModal = () => document.getElementById('user-settings-modal').classList.add('hidden');
-        window.applyCustomUserId = () => {
-            const id = document.getElementById('custom-user-id-input').value.trim();
-            if (id) { localStorage.setItem('custom_user_id', id); window.location.reload(); }
+
+        window.closeHistoryModal = () => {
+            document.getElementById('history-modal').classList.add('hidden');
         };
-        window.resetToSystemId = () => { localStorage.removeItem('custom_user_id'); window.location.reload(); };
-        window.showHistoryModal = () => { document.getElementById('history-modal').classList.remove('hidden'); window.fetchLogsForDate(getTodayDateString()); };
-        window.closeHistoryModal = () => document.getElementById('history-modal').classList.add('hidden');
-        window.fetchLogsForDate = async (d) => {
-            const snap = await getDocs(getDailyLogCollectionRef(d));
-            const h = []; snap.forEach(doc => h.push({ id: doc.id, ...doc.data() }));
-            h.sort((a,b) => b.timestamp - a.timestamp); renderTimeline(h, document.getElementById('history-log-entries'), true, d);
+
+        window.fetchLogsForDate = async (dateStr) => {
+            const container = document.getElementById('history-log-entries');
+            container.innerHTML = `<p class="text-gray-500 text-center py-10">載入中...</p>`;
+
+            if (!isAuthReady || !dataUserId) {
+                 container.innerHTML = `<p class="text-red-400 text-center py-10">驗證失敗，無法查詢歷史紀錄。</p>`;
+                 return;
+            }
+
+            try {
+                const logCollectionRef = getDailyLogCollectionRef(dateStr);
+                const querySnapshot = await getDocs(logCollectionRef);
+
+                const historyLogs = [];
+                querySnapshot.forEach(doc => {
+                    historyLogs.push({ id: doc.id, ...doc.data() });
+                });
+                
+                historyLogs.sort((a, b) => b.timestamp - a.timestamp);
+
+                renderTimeline(historyLogs, container, true, dateStr);
+
+            } catch (e) {
+                console.error("Error fetching history logs:", e);
+                container.innerHTML = `<p class="text-red-400 text-center py-10">查詢歷史紀錄失敗: ${e.message}</p>`;
+            }
         };
-        window.resetMonthlyStatus = () => { if (confirm("確定重置所有每月任務？")) setDoc(getMonthlyStatusDocRef(), {}); };
-        window.exportRoutineTasks = () => {
-            const blob = new Blob([JSON.stringify(routineTasks, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'tasks.json'; a.click();
-        };
-        window.importRoutineTasks = () => {
-            const input = document.createElement('input'); input.type = 'file'; input.onchange = (e) => {
-                const reader = new FileReader(); reader.onload = (ev) => { saveRoutineTasks(JSON.parse(ev.target.result)); }; reader.readAsText(e.target.files[0]);
-            }; input.click();
-        };
+
         window.togglePrintView = () => {
-            const content = document.getElementById('print-content');
-            const tasks = document.getElementById('routine-tasks-list').cloneNode(true);
-            const logs = document.getElementById('daily-log-timeline').cloneNode(true);
-            tasks.querySelectorAll('.no-print, button, input').forEach(el => el.remove());
-            logs.querySelectorAll('.no-print, button').forEach(el => el.remove());
-            content.innerHTML = `<h1 class="text-2xl font-bold mb-4">工作日誌報告 - ${getTodayDateString()}</h1>`;
-            content.appendChild(tasks); content.appendChild(logs);
-            document.getElementById('print-modal').classList.remove('hidden');
+            const printModal = document.getElementById('print-modal');
+            const printContent = document.getElementById('print-content');
+            
+            // 複製 Routine Center 和 Monthly Center
+            const routineBlock = document.querySelector('.lg\\:col-span-8 > .card:nth-child(1)').cloneNode(true);
+            const logBlock = document.querySelector('.lg\\:col-span-8 > .card:last-child').cloneNode(true);
+
+            [routineBlock, logBlock].forEach(block => {
+                block.querySelectorAll('.no-print').forEach(el => el.remove());
+                block.querySelectorAll('button').forEach(el => el.remove());
+                // 移除輸入框
+                block.querySelectorAll('input[type="text"]').forEach(el => el.parentElement.remove());
+                block.querySelectorAll('select').forEach(el => el.parentElement.remove());
+            });
+
+            logBlock.querySelector('#log-count-badge')?.remove();
+            
+            const logTitleEl = logBlock.querySelector('h2');
+            if (logTitleEl) {
+                logTitleEl.textContent = `日誌時間軸 (${formatDisplayDate(getTodayDateString())})`;
+            }
+
+            const headerHTML = `
+                <div class="text-center mb-6">
+                    <h1 class="text-3xl font-extrabold text-gray-800">工作日誌報告</h1>
+                    <p class="text-gray-600 mt-1">日期: ${formatDisplayDate(getTodayDateString())}</p>
+                    <p class="text-gray-600">用戶 ID: ${dataUserId}</p>
+                </div>
+            `;
+
+            printContent.innerHTML = headerHTML;
+            printContent.appendChild(routineBlock);
+            printContent.appendChild(logBlock);
+            
+            printModal.classList.remove('hidden');
+        };
+
+        // --- 新增的編輯邏輯函式 ---
+
+        // 1. 編輯類別名稱
+        window.editCategoryName = (event, oldCategory) => {
+            event.stopPropagation(); // 防止點擊編輯按鈕時觸發手風琴收合
+            const newCategory = prompt(`請輸入類別「${oldCategory}」的新名稱：`, oldCategory);
+            
+            if (!newCategory || newCategory.trim() === "" || newCategory === oldCategory) return;
+
+            // 更新所有屬於該類別的任務
+            const updatedTasks = routineTasks.map(task => {
+                if (task.category === oldCategory) {
+                    return { ...task, category: newCategory.trim() };
+                }
+                return task;
+            });
+
+            // 更新已展開的類別 Set
+            if (openCategories.has(oldCategory)) {
+                openCategories.delete(oldCategory);
+                openCategories.add(newCategory.trim());
+            }
+
+            saveRoutineTasks(updatedTasks);
+        };
+
+        // 2. 編輯任務詳細內容
+        window.editTaskDetails = (taskName) => {
+            const task = routineTasks.find(t => t.name === taskName);
+            if (!task) return;
+
+            const newName = prompt(`編輯任務名稱：`, task.name);
+            if (!newName || newName.trim() === "") return;
+
+            // 檢查名稱是否與其他任務重複 (除非是自己)
+            if (newName !== task.name && routineTasks.some(t => t.name === newName)) {
+                alert("任務名稱已重複，請使用其他名稱。");
+                return;
+            }
+
+            const newNotes = prompt(`編輯任務備註：`, task.notes || "");
+            const isMonthly = confirm(`任務頻率設定：\n按下「確定」設為每月任務 (Monthly)\n按下「取消」設為每日任務 (Daily)`);
+            const newFreq = isMonthly ? "Monthly" : "Daily";
+
+            const updatedTasks = routineTasks.map(t => {
+                if (t.name === taskName) {
+                    return { ...t, name: newName.trim(), notes: newNotes, frequency: newFreq };
+                }
+                return t;
+            });
+
+            // 如果修改了任務名稱，且該任務原本有每月完成紀錄，則需要處理紀錄遷移
+            if (newName !== taskName && monthlyTaskStatus[taskName]) {
+                 const newStatus = { ...monthlyTaskStatus };
+                 newStatus[newName] = newStatus[taskName];
+                 delete newStatus[taskName];
+                 setDoc(getMonthlyStatusDocRef(), newStatus);
+            }
+
+            saveRoutineTasks(updatedTasks);
         };
 
         window.onload = initFirebase;
+
     </script>
 </body>
 </html>
