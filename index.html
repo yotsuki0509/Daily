@@ -362,9 +362,18 @@
             </h3>
             <input type="hidden" id="edit-original-name">
             <div class="space-y-4">
-                <div>
-                    <label class="block text-sm text-gray-400 mb-1">類別 (Category)</label>
-                    <input type="text" id="edit-task-category" class="w-full p-2.5 border border-slate-600 bg-slate-900 rounded-lg text-gray-100 focus:ring-cyan-500 focus:border-cyan-500 outline-none">
+                <div class="flex space-x-3">
+                    <div class="w-1/2">
+                        <label class="block text-sm text-gray-400 mb-1">類別 (Category)</label>
+                        <input type="text" id="edit-task-category" class="w-full p-2.5 border border-slate-600 bg-slate-900 rounded-lg text-gray-100 focus:ring-cyan-500 focus:border-cyan-500 outline-none">
+                    </div>
+                    <div class="w-1/2">
+                        <label class="block text-sm text-gray-400 mb-1">頻率 (Frequency)</label>
+                        <select id="edit-task-frequency" class="w-full p-2.5 border border-slate-600 bg-slate-900 rounded-lg text-gray-100 focus:ring-cyan-500 focus:border-cyan-500 outline-none">
+                            <option value="Daily">每日 (Daily)</option>
+                            <option value="Monthly">每月 (Monthly)</option>
+                        </select>
+                    </div>
                 </div>
                 <div>
                     <label class="block text-sm text-gray-400 mb-1">任務名稱 (Task Name)</label>
@@ -992,6 +1001,14 @@
             
             showMessage('confirm', '刪除日誌', '確定要刪除這筆紀錄嗎？若是例行任務將會變回未完成狀態。', async () => {
                 try {
+                    // [新增] 檢查是否為每月任務日誌，並進行狀態同步
+                    if (dateStr === getTodayDateString()) {
+                        const logToDelete = dailyLogs.find(l => l.id === id);
+                        if (logToDelete && logToDelete.type === 'Monthly' && logToDelete.taskName) {
+                            await updateMonthlyTaskStatus(logToDelete.taskName, false);
+                        }
+                    }
+
                     await deleteDoc(doc(getDailyLogCollectionRef(dateStr), id));
                     if (dateStr !== getTodayDateString()) fetchLogsForDate(dateStr); 
                 } catch (e) {
@@ -1010,6 +1027,9 @@
 
             document.getElementById('edit-original-name').value = task.name;
             document.getElementById('edit-task-category').value = task.category || '';
+            // [新增] 載入目前的頻率
+            document.getElementById('edit-task-frequency').value = task.frequency || 'Daily';
+
             document.getElementById('edit-task-name').value = task.name;
             document.getElementById('edit-task-notes').value = task.notes || '';
             
@@ -1019,6 +1039,7 @@
         window.saveTaskEdits = async () => {
             const originalName = document.getElementById('edit-original-name').value;
             const newCategory = document.getElementById('edit-task-category').value.trim() || '未分類';
+            const newFrequency = document.getElementById('edit-task-frequency').value; // [新增] 取得新頻率
             const newName = document.getElementById('edit-task-name').value.trim();
             const newNotes = document.getElementById('edit-task-notes').value.trim();
 
@@ -1035,26 +1056,71 @@
                 // 1. 更新 routineTasks 陣列
                 const updatedTasks = routineTasks.map(task => {
                     if (task.name === originalName) {
-                        return { ...task, name: newName, category: newCategory, notes: newNotes };
+                        return { 
+                            ...task, 
+                            name: newName, 
+                            category: newCategory, 
+                            notes: newNotes,
+                            frequency: newFrequency
+                        };
                     }
                     return task;
                 });
 
-                // 2. 處理改名後的連鎖反應
+                // 2. 處理改名後的連鎖反應 & 頻率切換的狀態同步
+                const originalTask = routineTasks.find(t => t.name === originalName);
+                const oldFrequency = originalTask ? (originalTask.frequency || 'Daily') : 'Daily';
+
+                // (A) 處理每月狀態 (monthlyStatus) 的遷移
+                // 狀況一：從 Daily 變成 Monthly -> 如果今天已經做過(在日誌裡)，應該要自動標記為完成
+                if (oldFrequency !== 'Monthly' && newFrequency === 'Monthly') {
+                     // 檢查今日是否有相關日誌
+                     const hasLogToday = dailyLogs.some(l => l.taskName === originalName);
+                     if (hasLogToday) {
+                         // 強制寫入完成狀態
+                         await updateMonthlyTaskStatus(originalName, true); 
+                     }
+                }
+                
+                // 狀況二：從 Monthly 變成 Daily -> 移除每月完成狀態 (避免變成幽靈資料)
+                if (oldFrequency === 'Monthly' && newFrequency !== 'Monthly') {
+                     await updateMonthlyTaskStatus(originalName, false);
+                }
+
+                // (B) 處理改名/改頻率後的連鎖反應
                 if (newName !== originalName) {
-                    // (A) 如果是 Monthly 任務，更新 monthlyStatus
+                    // 如果舊名字在每月狀態裡，搬移到新名字
                     if (monthlyTaskStatus[originalName]) {
                         monthlyTaskStatus[newName] = monthlyTaskStatus[originalName];
                         delete monthlyTaskStatus[originalName];
                         await setDoc(getMonthlyStatusDocRef(), monthlyTaskStatus);
                     }
 
-                    // (B) 更新今日相關日誌 (避免改名後，進度條顯示未完成)
-                    const logsToUpdate = dailyLogs.filter(l => (l.type === 'Routine' || l.type === 'Monthly') && l.taskName === originalName);
+                    // 更新今日相關日誌 (包含頻率改變導致的 type 改變)
+                    const logsToUpdate = dailyLogs.filter(l => l.taskName === originalName);
                     for (const log of logsToUpdate) {
-                        // 更新 Firestore
-                        await updateDoc(doc(getDailyLogCollectionRef(), log.id), { taskName: newName, category: newCategory });
+                        const newType = newFrequency === 'Monthly' ? 'Monthly' : 'Routine';
+                        await updateDoc(doc(getDailyLogCollectionRef(), log.id), { 
+                            taskName: newName, 
+                            category: newCategory,
+                            type: newType 
+                        });
                     }
+                } else {
+                     // 名字沒變，但頻率或類別變了
+                     if (oldFrequency !== newFrequency) {
+                         const logsToUpdate = dailyLogs.filter(l => l.taskName === originalName);
+                         for (const log of logsToUpdate) {
+                            const newType = newFrequency === 'Monthly' ? 'Monthly' : 'Routine';
+                            await updateDoc(doc(getDailyLogCollectionRef(), log.id), { type: newType, category: newCategory });
+                         }
+                     } else {
+                         // 只有類別變更
+                         const logsToUpdate = dailyLogs.filter(l => l.taskName === originalName);
+                         for (const log of logsToUpdate) {
+                            await updateDoc(doc(getDailyLogCollectionRef(), log.id), { category: newCategory });
+                         }
+                     }
                 }
 
                 // 3. 儲存新的任務列表
