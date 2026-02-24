@@ -167,18 +167,21 @@
                         [QUICK CAPTURE] 臨時事項
                     </h2>
                     <div class="flex flex-col gap-3">
-                        <!-- 分類選擇 -->
-                        <select id="adhoc-category" class="w-full p-2.5 border border-slate-700 bg-slate-900 rounded-lg text-sm text-gray-100 focus:ring-red-500 focus:border-red-500">
-                            <option value="一般">📌 一般事項</option>
-                            <option value="會議">🗣️ 會議溝通</option>
-                            <option value="維修">🔧 維修/除錯</option>
-                            <option value="開發">💻 專案開發</option>
-                            <option value="支援">🤝 支援協助</option>
-                            <option value="行政">📄 行政處理</option>
-                        </select>
-                        <input type="text" id="adhoc-task-description" placeholder="發生了什麼事？ (例如：處理入庫單號異常)" class="w-full p-2.5 border border-slate-700 bg-slate-900 rounded-lg text-sm text-gray-100 focus:ring-red-500 focus:border-red-500">
+                        <!-- 分類選擇與需求人員 (並排) -->
+                        <div class="flex space-x-2">
+                            <select id="adhoc-category" class="w-1/2 p-2.5 border border-slate-700 bg-slate-900 rounded-lg text-sm text-gray-100 focus:ring-red-500 focus:border-red-500">
+                                <option value="一般">📌 一般事項</option>
+                                <option value="會議">🗣️ 會議溝通</option>
+                                <option value="維修">🔧 維修/除錯</option>
+                                <option value="開發">💻 專案開發</option>
+                                <option value="支援">🤝 支援協助</option>
+                                <option value="行政">📄 行政處理</option>
+                            </select>
+                            <input type="text" id="adhoc-requester" placeholder="提需求人員 (選填)" onkeydown="if(event.key === 'Enter') logAdHocTask()" class="w-1/2 p-2.5 border border-slate-700 bg-slate-900 rounded-lg text-sm text-gray-100 focus:ring-red-500 focus:border-red-500">
+                        </div>
+                        <input type="text" id="adhoc-task-description" placeholder="發生了什麼事？ (例如：處理入庫單號異常)" onkeydown="if(event.key === 'Enter') logAdHocTask()" class="w-full p-2.5 border border-slate-700 bg-slate-900 rounded-lg text-sm text-gray-100 focus:ring-red-500 focus:border-red-500">
                         <button onclick="logAdHocTask()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg shadow-md transition duration-150 text-sm">
-                            紀錄 (Log Entry)
+                            紀錄 (Log/Enter)
                         </button>
                     </div>
                 </div>
@@ -391,7 +394,7 @@
         </div>
     </div>
 
-     <!-- 編輯類別模態視窗 (NEW) -->
+     <!-- 編輯類別模態視窗 -->
     <div id="edit-category-modal" class="modal-overlay hidden" style="z-index: 270;">
         <div class="modal-content p-6 rounded-xl shadow-2xl w-full max-w-sm bg-slate-800 border border-slate-600">
             <h3 class="text-xl font-bold text-cyan-400 mb-4 flex items-center">
@@ -412,7 +415,6 @@
             </div>
         </div>
     </div>
-
 
     <!-- Firebase SDKs -->
     <script type="module">
@@ -454,7 +456,7 @@
         let completedRoutineTaskNames = new Set(); 
         
         // --- 每月任務狀態 ---
-        let monthlyTaskStatus = {}; // 儲存每月任務完成狀態 { taskName: timestamp }
+        let monthlyTaskStatus = {}; 
         
         let dailyLogs = [];
         let statsChart = null;
@@ -618,17 +620,12 @@
             return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
         };
 
-        // Firestore 路徑定義 - 關鍵修改：使用 dataUserId 而非 authUserId
         const getRoutineTasksDocRef = () => dataUserId ? doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'routine_tasks') : null;
-        
-        // 每月任務狀態的路徑 (保留以追蹤完成狀態)
         const getMonthlyStatusDocRef = () => dataUserId ? doc(db, 'artifacts', appId, 'users', dataUserId, 'config', 'monthly_status') : null;
-
         const getDailyLogCollectionRef = (dateString = getTodayDateString()) => dataUserId ? collection(db, 'artifacts', appId, 'users', dataUserId, 'daily_logs', dateString, 'entries') : null;
 
         // --- User ID Management ---
         const determineDataUserId = (authenticatedUid) => {
-            // 檢查 LocalStorage 是否有使用者自訂的 ID
             const storedCustomId = localStorage.getItem('custom_user_id');
             if (storedCustomId) {
                 return storedCustomId;
@@ -652,7 +649,6 @@
                 showMessage('error', '錯誤', 'ID 不能為空');
                 return;
             }
-            // 簡單的格式驗證
             if (/[^a-zA-Z0-9\-_]/.test(input)) {
                 showMessage('error', '格式錯誤', 'ID 只能包含英文字母、數字、減號(-)與底線(_)');
                 return;
@@ -660,7 +656,7 @@
 
             showMessage('confirm', '切換帳號', `確定要切換到 ID: ${input} 嗎？`, () => {
                 localStorage.setItem('custom_user_id', input);
-                window.location.reload(); // 重新整理最乾脆，確保所有狀態重置
+                window.location.reload(); 
             });
         };
 
@@ -693,16 +689,13 @@
 
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
-                        authUserId = user.uid; // 這是 Firebase 認證的 UID
+                        authUserId = user.uid; 
                         isAuthReady = true;
 
-                        // 決定要讀取資料的 ID (自訂 ID 優先)
                         dataUserId = determineDataUserId(authUserId);
                         
-                        // 顯示目前使用的 Data Source ID
                         const displayEl = document.getElementById('user-id-display');
                         displayEl.textContent = dataUserId;
-                        // 如果是自訂 ID，加個標記
                         if (dataUserId !== authUserId) {
                              displayEl.textContent += " (Custom)";
                              displayEl.classList.add("text-yellow-400");
@@ -710,17 +703,15 @@
                         
                         initChart(); 
                         loadRoutineTasks();
-                        loadMonthlyStatus(); // 載入每月任務狀態
+                        loadMonthlyStatus(); 
                         subscribeToDailyLogs();
                         
-                        // UI Transition
                         document.getElementById('loading-overlay').classList.add('opacity-0');
                         setTimeout(() => {
                             document.getElementById('loading-overlay').style.display = 'none';
                             document.getElementById('app-container').style.display = 'block';
                         }, 300);
                         
-                        // 如果是第一次匿名登入且沒有設定自訂 ID，提示用戶
                         if (dataUserId === authUserId && !localStorage.getItem('seen_user_tip')) {
                              localStorage.setItem('seen_user_tip', 'true');
                         }
@@ -735,20 +726,19 @@
             }
         };
 
-        // --- Logic: Routine Tasks (Integrated) ---
+        // --- Logic: Routine Tasks ---
         const loadRoutineTasks = () => {
             if (!isAuthReady || !dataUserId) return;
             
-            if (unsubscribeRoutine) unsubscribeRoutine(); // 取消舊的監聽
+            if (unsubscribeRoutine) unsubscribeRoutine(); 
 
             unsubscribeRoutine = onSnapshot(getRoutineTasksDocRef(), (docSnap) => {
                 if (docSnap.exists() && Array.isArray(docSnap.data().tasks)) {
                     routineTasks = docSnap.data().tasks.map(task => ({
-                        // Ensure required fields exist
                         name: task.name || '無名稱任務', 
                         category: task.category || '未分類', 
                         notes: task.notes || '',
-                        frequency: task.frequency || 'Daily' // Default to Daily for legacy data
+                        frequency: task.frequency || 'Daily' 
                     }));
                 } else {
                     routineTasks = [];
@@ -762,7 +752,6 @@
             });
         };
         
-        // 載入每月任務狀態
         const loadMonthlyStatus = () => {
             if (!isAuthReady || !dataUserId) return;
             if (unsubscribeMonthlyStatus) unsubscribeMonthlyStatus();
@@ -773,7 +762,7 @@
                 } else {
                     monthlyTaskStatus = {};
                 }
-                renderRoutineTasks(); // 狀態改變時重繪
+                renderRoutineTasks(); 
             });
         };
 
@@ -791,15 +780,14 @@
             }
         };
         
-        // 更新每月任務狀態
         const updateMonthlyTaskStatus = async (taskName, isCompleted) => {
              if (!isAuthReady || !dataUserId) return;
              try {
                  const newStatus = { ...monthlyTaskStatus };
                  if (isCompleted) {
-                     newStatus[taskName] = Date.now(); // 紀錄完成時間戳
+                     newStatus[taskName] = Date.now(); 
                  } else {
-                     delete newStatus[taskName]; // 移除代表未完成
+                     delete newStatus[taskName]; 
                  }
                  await setDoc(getMonthlyStatusDocRef(), newStatus);
              } catch(e) {
@@ -807,7 +795,6 @@
              }
         };
         
-        // 重置每月任務狀態
         window.resetMonthlyStatus = () => {
              showMessage('confirm', '重置確認', '確定要將所有「每月任務」重置為未完成狀態嗎？(建議於月初執行)', async () => {
                  try {
@@ -848,7 +835,6 @@
                     for (const log of logsToDelete) {
                         await deleteDoc(doc(getDailyLogCollectionRef(), log.id));
                     }
-                    // 如果是每月任務，也要清除狀態
                     if (task.frequency === 'Monthly') {
                         await updateMonthlyTaskStatus(taskName, false);
                     }
@@ -941,7 +927,7 @@
         const subscribeToDailyLogs = () => {
             if (!isAuthReady || !dataUserId) return;
             
-            if (unsubscribeLogs) unsubscribeLogs(); // 取消舊的監聽
+            if (unsubscribeLogs) unsubscribeLogs(); 
 
             unsubscribeLogs = onSnapshot(getDailyLogCollectionRef(), (snapshot) => {
                 dailyLogs = [];
@@ -965,7 +951,8 @@
             });
         };
 
-        window.addLogEntry = async (type, description, taskName = null, category = '一般') => {
+        // 新增 requester 參數
+        window.addLogEntry = async (type, description, taskName = null, category = '一般', requester = '') => {
             if (!description) return false;
             if (!isAuthReady || !dataUserId) {
                  showMessage('error', '驗證錯誤', 'Firebase 尚未準備完成，無法寫入日誌。');
@@ -973,7 +960,7 @@
             }
             try {
                 await addDoc(getDailyLogCollectionRef(), {
-                    type, description, taskName, category,
+                    type, description, taskName, category, requester, // 儲存需求人員
                     timestamp: Date.now(),
                     timeString: new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
                 });
@@ -988,11 +975,17 @@
         window.logAdHocTask = async () => {
             const descInput = document.getElementById('adhoc-task-description');
             const catInput = document.getElementById('adhoc-category');
-            if (!descInput.value.trim()) return showMessage('error', '空值', '請輸入描述');
+            const reqInput = document.getElementById('adhoc-requester');
             
-            const success = await window.addLogEntry('AdHoc', descInput.value.trim(), null, catInput.value);
+            const descText = descInput.value.trim();
+            const reqText = reqInput.value.trim();
+
+            if (!descText) return showMessage('error', '空值', '請輸入描述');
+            
+            const success = await window.addLogEntry('AdHoc', descText, null, catInput.value, reqText);
             if (success) {
                 descInput.value = '';
+                reqInput.value = ''; // 成功後自動清空
             }
         };
 
@@ -1001,7 +994,6 @@
             
             showMessage('confirm', '刪除日誌', '確定要刪除這筆紀錄嗎？若是例行任務將會變回未完成狀態。', async () => {
                 try {
-                    // [新增] 檢查是否為每月任務日誌，並進行狀態同步
                     if (dateStr === getTodayDateString()) {
                         const logToDelete = dailyLogs.find(l => l.id === id);
                         if (logToDelete && logToDelete.type === 'Monthly' && logToDelete.taskName) {
@@ -1018,7 +1010,7 @@
             });
         };
 
-        // --- NEW: Edit Task Logic ---
+        // --- Edit Task Logic ---
         window.closeEditModal = () => document.getElementById('edit-task-modal').classList.add('hidden');
 
         window.openEditModal = (taskName) => {
@@ -1027,7 +1019,6 @@
 
             document.getElementById('edit-original-name').value = task.name;
             document.getElementById('edit-task-category').value = task.category || '';
-            // [新增] 載入目前的頻率
             document.getElementById('edit-task-frequency').value = task.frequency || 'Daily';
 
             document.getElementById('edit-task-name').value = task.name;
@@ -1039,13 +1030,12 @@
         window.saveTaskEdits = async () => {
             const originalName = document.getElementById('edit-original-name').value;
             const newCategory = document.getElementById('edit-task-category').value.trim() || '未分類';
-            const newFrequency = document.getElementById('edit-task-frequency').value; // [新增] 取得新頻率
+            const newFrequency = document.getElementById('edit-task-frequency').value; 
             const newName = document.getElementById('edit-task-name').value.trim();
             const newNotes = document.getElementById('edit-task-notes').value.trim();
 
             if (!newName) return showMessage('error', '錯誤', '任務名稱不可為空');
             
-            // 檢查名稱是否與其他現有任務重複 (排除自己)
             if (newName !== originalName && routineTasks.some(t => t.name === newName)) {
                 return showMessage('error', '錯誤', '該任務名稱已存在，請使用不同名稱。');
             }
@@ -1053,7 +1043,6 @@
             if (!isAuthReady || !dataUserId) return showMessage('error', '錯誤', '系統尚未就緒');
 
             try {
-                // 1. 更新 routineTasks 陣列
                 const updatedTasks = routineTasks.map(task => {
                     if (task.name === originalName) {
                         return { 
@@ -1067,36 +1056,27 @@
                     return task;
                 });
 
-                // 2. 處理改名後的連鎖反應 & 頻率切換的狀態同步
                 const originalTask = routineTasks.find(t => t.name === originalName);
                 const oldFrequency = originalTask ? (originalTask.frequency || 'Daily') : 'Daily';
 
-                // (A) 處理每月狀態 (monthlyStatus) 的遷移
-                // 狀況一：從 Daily 變成 Monthly -> 如果今天已經做過(在日誌裡)，應該要自動標記為完成
                 if (oldFrequency !== 'Monthly' && newFrequency === 'Monthly') {
-                     // 檢查今日是否有相關日誌
                      const hasLogToday = dailyLogs.some(l => l.taskName === originalName);
                      if (hasLogToday) {
-                         // 強制寫入完成狀態
                          await updateMonthlyTaskStatus(originalName, true); 
                      }
                 }
                 
-                // 狀況二：從 Monthly 變成 Daily -> 移除每月完成狀態 (避免變成幽靈資料)
                 if (oldFrequency === 'Monthly' && newFrequency !== 'Monthly') {
                      await updateMonthlyTaskStatus(originalName, false);
                 }
 
-                // (B) 處理改名/改頻率後的連鎖反應
                 if (newName !== originalName) {
-                    // 如果舊名字在每月狀態裡，搬移到新名字
                     if (monthlyTaskStatus[originalName]) {
                         monthlyTaskStatus[newName] = monthlyTaskStatus[originalName];
                         delete monthlyTaskStatus[originalName];
                         await setDoc(getMonthlyStatusDocRef(), monthlyTaskStatus);
                     }
 
-                    // 更新今日相關日誌 (包含頻率改變導致的 type 改變)
                     const logsToUpdate = dailyLogs.filter(l => l.taskName === originalName);
                     for (const log of logsToUpdate) {
                         const newType = newFrequency === 'Monthly' ? 'Monthly' : 'Routine';
@@ -1107,7 +1087,6 @@
                         });
                     }
                 } else {
-                     // 名字沒變，但頻率或類別變了
                      if (oldFrequency !== newFrequency) {
                          const logsToUpdate = dailyLogs.filter(l => l.taskName === originalName);
                          for (const log of logsToUpdate) {
@@ -1115,7 +1094,6 @@
                             await updateDoc(doc(getDailyLogCollectionRef(), log.id), { type: newType, category: newCategory });
                          }
                      } else {
-                         // 只有類別變更
                          const logsToUpdate = dailyLogs.filter(l => l.taskName === originalName);
                          for (const log of logsToUpdate) {
                             await updateDoc(doc(getDailyLogCollectionRef(), log.id), { category: newCategory });
@@ -1123,7 +1101,6 @@
                      }
                 }
 
-                // 3. 儲存新的任務列表
                 await saveRoutineTasks(updatedTasks);
                 closeEditModal();
                 showMessage('success', '更新成功', '任務資訊已更新。');
@@ -1134,8 +1111,7 @@
             }
         };
 
-        // --- NEW: Edit & Move Category Logic ---
-        
+        // --- Edit & Move Category Logic ---
         window.closeEditCategoryModal = () => document.getElementById('edit-category-modal').classList.add('hidden');
         
         window.openEditCategoryModal = (categoryName) => {
@@ -1157,7 +1133,6 @@
             if (!isAuthReady || !dataUserId) return showMessage('error', '錯誤', '系統尚未就緒');
             
             try {
-                // 1. 批量更新任務的類別名稱
                 const newTasks = routineTasks.map(t => {
                     if ((t.category || '未分類') === oldName) {
                         return { ...t, category: newName };
@@ -1165,7 +1140,6 @@
                     return t;
                 });
                 
-                // 2. 更新今日相關日誌 (避免改類別後，日誌還留在舊類別)
                 const logsToUpdate = dailyLogs.filter(l => l.category === oldName);
                 for (const log of logsToUpdate) {
                      await updateDoc(doc(getDailyLogCollectionRef(), log.id), { category: newName });
@@ -1173,7 +1147,6 @@
 
                 await saveRoutineTasks(newTasks);
                 
-                // 如果舊類別是展開的，新類別也要展開，並移除舊的
                 if (openCategories.has(oldName)) {
                     openCategories.delete(oldName);
                     openCategories.add(newName);
@@ -1190,7 +1163,6 @@
         window.moveCategory = async (categoryName, direction) => {
             if (!isAuthReady || !dataUserId) return showMessage('error', '錯誤', '系統尚未就緒');
             
-            // 1. 先將目前任務依類別分組 (保持現有順序)
             const tasksByCategory = {};
             const categoryOrder = [];
             
@@ -1203,68 +1175,53 @@
                 tasksByCategory[cat].push(t);
             });
             
-            // 2. 找到要移動的類別 index
             const idx = categoryOrder.indexOf(categoryName);
             if (idx === -1) return;
             
-            // 3. 交換類別順序
             const targetIdx = idx + direction;
-            if (targetIdx < 0 || targetIdx >= categoryOrder.length) return; // 無法移動
+            if (targetIdx < 0 || targetIdx >= categoryOrder.length) return; 
             
             [categoryOrder[idx], categoryOrder[targetIdx]] = [categoryOrder[targetIdx], categoryOrder[idx]];
             
-            // 4. 依照新的類別順序，重新組建 routineTasks 陣列
-            // 這會隱性地將所有任務重新排序，這對於「類別排序」是必要的，因為我們沒有獨立存儲類別設定
             const newRoutineTasks = [];
             categoryOrder.forEach(cat => {
                 newRoutineTasks.push(...tasksByCategory[cat]);
             });
             
-            // 5. 儲存
             await saveRoutineTasks(newRoutineTasks);
         };
 
         window.moveTask = async (taskName, direction) => {
             if (!isAuthReady || !dataUserId) return showMessage('error', '錯誤', '系統尚未就緒');
             
-            // 1. 找到當前任務與其類別
             const currentTaskIndex = routineTasks.findIndex(t => t.name === taskName);
             if (currentTaskIndex === -1) return;
             const currentTask = routineTasks[currentTaskIndex];
             
-            // 2. 找出該類別的所有任務（以目前順序）
             const categoryTasks = routineTasks.filter(t => t.category === currentTask.category);
             const indexInCategory = categoryTasks.findIndex(t => t.name === taskName);
             
-            // 3. 判斷是否可以移動
             let swapTargetName = null;
             
-            // 向上移動 (與同類別的上一個交換)
             if (direction === -1 && indexInCategory > 0) {
                 swapTargetName = categoryTasks[indexInCategory - 1].name;
             } 
-            // 向下移動 (與同類別的下一個交換)
             else if (direction === 1 && indexInCategory < categoryTasks.length - 1) {
                 swapTargetName = categoryTasks[indexInCategory + 1].name;
             }
             
-            if (!swapTargetName) return; // 無法移動 (已經是第一個或最後一個)
+            if (!swapTargetName) return; 
 
-            // 4. 在主陣列中交換位置
             const targetIndex = routineTasks.findIndex(t => t.name === swapTargetName);
             
-            // 交換
             const temp = routineTasks[currentTaskIndex];
             routineTasks[currentTaskIndex] = routineTasks[targetIndex];
             routineTasks[targetIndex] = temp;
             
-            // 5. 儲存
             await saveRoutineTasks(routineTasks);
         };
 
-
         // --- UI Rendering ---
-
         const renderRoutineTasks = () => {
             const list = document.getElementById('routine-tasks-list');
             list.innerHTML = '';
@@ -1288,7 +1245,6 @@
 
             categoryKeys.forEach((category, catIdx) => {
                 const tasks = tasksByCategory[category];
-                // 計算完成度
                 let completedCount = 0;
                 tasks.forEach(task => {
                     const isMonthly = task.frequency === 'Monthly';
@@ -1358,7 +1314,6 @@
                     const isMonthly = task.frequency === 'Monthly';
                     const isDone = isMonthly ? !!monthlyTaskStatus[task.name] : completedRoutineTaskNames.has(task.name);
                     
-                    // 根據頻率決定顏色：每月使用綠色系，每日使用藍色系
                     const activeColorClass = isMonthly 
                         ? (isDone ? 'border-emerald-600 bg-emerald-900/20 opacity-70' : 'border-slate-700 hover:border-emerald-500 bg-slate-700/50')
                         : (isDone ? 'border-blue-700 bg-blue-900/20 opacity-70' : 'border-slate-700 hover:border-cyan-400 bg-slate-700/50');
@@ -1372,7 +1327,6 @@
                         ? `<span class="text-[10px] bg-emerald-700 text-white px-1.5 py-0.5 rounded ml-2 font-mono">月</span>`
                         : `<span class="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded ml-2 font-mono">日</span>`;
 
-                    // Check if first or last in category for disabling sort buttons
                     const isFirst = index === 0;
                     const isLast = index === tasks.length - 1;
                     const sortButtonsHTML = `
@@ -1414,11 +1368,9 @@
                     if (!isDone) {
                         taskEl.querySelector('input').addEventListener('change', async (e) => {
                              e.target.disabled = true;
-                             // 如果是每月任務，更新永久狀態
                              if (isMonthly) {
                                  await updateMonthlyTaskStatus(task.name, true);
                              }
-                             // 統一寫入日誌
                              const logType = isMonthly ? 'Monthly' : 'Routine';
                              const success = await window.addLogEntry(logType, `完成: ${task.name} (${category})`, task.name, category);
                              
@@ -1442,7 +1394,6 @@
 
             logs.forEach(log => {
                 const isRoutine = log.type === 'Routine' || log.type === 'Monthly';
-                // [NEW] 如果是 Monthly 使用綠色 Icon
                 const isMonthly = log.type === 'Monthly';
                 
                 let iconColor = isMonthly ? 'text-emerald-400' : (isRoutine ? 'text-blue-400' : 'text-red-400');
@@ -1452,6 +1403,12 @@
                     ? `<svg class="w-4 h-4 ${iconColor}" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>`
                     : `<svg class="w-4 h-4 ${iconColor}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
                 
+                // 處理提需求人員的顯示
+                let displayDesc = log.description;
+                if (log.requester) {
+                    displayDesc = `<span class="text-yellow-400 font-bold mr-1">[${log.requester}]</span>${displayDesc}`;
+                }
+
                 const logItem = document.createElement('div');
                 logItem.className = 'timeline-item';
                 logItem.innerHTML = `
@@ -1461,7 +1418,7 @@
                             <div class="flex-1">
                                 <p class="text-sm font-bold text-gray-100 flex items-center mb-1">
                                     ${icon}
-                                    <span class="ml-2">${log.description}</span>
+                                    <span class="ml-2">${displayDesc}</span>
                                 </p>
                                 <p class="text-xs text-gray-400 font-mono">
                                     [${log.type}] ${log.category}
@@ -1523,14 +1480,12 @@
             const printModal = document.getElementById('print-modal');
             const printContent = document.getElementById('print-content');
             
-            // 複製 Routine Center 和 Monthly Center
             const routineBlock = document.querySelector('.lg\\:col-span-8 > .card:nth-child(1)').cloneNode(true);
             const logBlock = document.querySelector('.lg\\:col-span-8 > .card:last-child').cloneNode(true);
 
             [routineBlock, logBlock].forEach(block => {
                 block.querySelectorAll('.no-print').forEach(el => el.remove());
                 block.querySelectorAll('button').forEach(el => el.remove());
-                // 移除輸入框
                 block.querySelectorAll('input[type="text"]').forEach(el => el.parentElement.remove());
                 block.querySelectorAll('select').forEach(el => el.parentElement.remove());
             });
