@@ -308,6 +308,7 @@
         calGlobalAppId: 'daily-23c82-app',
         department: localStorage.getItem('calendar_saved_dept') || 'public',
         events: [],
+        holidays: {},
         unsubEvents: null,
 
         logAppId: 'default-app-id',
@@ -330,7 +331,17 @@
     window.appState.todayStr = formatToYYYYMMDD(new Date());
     document.getElementById('header-date').textContent = formatToDash(new Date());
 
-    // --- Theme Management ---
+    window.fetchHolidays = async (year) => {
+        try {
+            const res = await fetch(`https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/${year}.json`);
+            if (res.ok) {
+                const data = await res.json();
+                data.forEach(day => { if (day.isHoliday) window.appState.holidays[day.date] = day.description || '休假日'; });
+                renderCalendar();
+            }
+        } catch (e) { console.error('Holidays API Error:', e); }
+    };
+
     window.toggleTheme = () => {
         const html = document.documentElement;
         html.classList.toggle('dark');
@@ -452,6 +463,8 @@
         const month = window.appState.currentDate.getMonth();
         document.getElementById('current-month-year').textContent = `${year} 年 ${month + 1} 月`;
         
+        if (!window.appState.holidays[`${year}0101`]) window.fetchHolidays(year);
+
         const daysInMonth = new Date(year, month + 1, 0).getDate();
         const firstDay = new Date(year, month, 1).getDay();
         const days = [];
@@ -463,10 +476,28 @@
         days.forEach(dayObj => {
             const dateStr = formatToYYYYMMDD(dayObj.date);
             const isToday = dateStr === window.appState.todayStr;
-            const bgClass = dayObj.isCurrent ? 'bg-transparent' : 'bg-slate-200/50 dark:bg-slate-900/60 opacity-60';
-            
+            const isWeekend = dayObj.date.getDay() === 0 || dayObj.date.getDay() === 6;
+            const holidayName = window.appState.holidays[dateStr];
+            const isRedDay = isWeekend || holidayName;
+
+            let bgClass = '';
+            if (!dayObj.isCurrent) {
+                bgClass = 'bg-slate-100/50 dark:bg-slate-900/30 opacity-60';
+            } else if (isRedDay) {
+                bgClass = 'bg-rose-50/50 dark:bg-rose-950/20';
+            } else {
+                bgClass = 'bg-white dark:bg-slate-800/20';
+            }
+
+            let numColor = 'text-slate-500 dark:text-slate-400';
+            if (isToday) {
+                numColor = 'bg-cyan-500 text-white shadow-lg';
+            } else if (isRedDay) {
+                numColor = 'text-rose-500 dark:text-rose-400';
+            }
+
             const cell = document.createElement('div');
-            cell.className = `min-h-[14vh] border-r border-b border-slate-200 dark:border-slate-700/80 p-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors flex flex-col ${bgClass}`;
+            cell.className = `min-h-[14vh] border-r border-b border-slate-200 dark:border-slate-700/80 p-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors flex flex-col ${bgClass}`;
             cell.onclick = () => {
                 const ds = formatToDash(dayObj.date);
                 document.getElementById('form-start-date')._flatpickr.setDate(ds);
@@ -484,7 +515,15 @@
                     return `<div class="px-2 py-1 rounded text-xs font-bold truncate mb-1.5 shadow-sm ${colorClass}">${timeTag}${evt.name}: ${evt.title}</div>`;
                 }).join('');
 
-            cell.innerHTML = `<div class="flex justify-center mb-2"><div class="w-8 h-8 flex items-center justify-center rounded-full text-sm font-black ${isToday ? 'bg-cyan-500 text-white shadow-lg' : 'text-slate-500'}">${dayObj.date.getDate()}</div></div><div class="flex-1 overflow-y-auto custom-scrollbar">${eventsHtml}</div>`;
+            const holidayLabel = (holidayName && dayObj.isCurrent) ? `<div class="text-[10px] font-black text-rose-500 dark:text-rose-400 truncate w-full text-center mt-0.5">${holidayName}</div>` : '';
+
+            cell.innerHTML = `
+                <div class="flex flex-col items-center mb-2">
+                    <div class="w-8 h-8 flex items-center justify-center rounded-full text-sm font-black ${numColor}">${dayObj.date.getDate()}</div>
+                    ${holidayLabel}
+                </div>
+                <div class="flex-1 overflow-y-auto custom-scrollbar">${eventsHtml}</div>
+            `;
             grid.appendChild(cell);
         });
     };
