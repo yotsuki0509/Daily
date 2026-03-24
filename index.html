@@ -11,7 +11,11 @@
       darkMode: 'class',
       theme: {
         extend: {
-          colors: { appBg: '#0f172a', panelBg: '#1e293b', cyanTheme: '#06b6d4' }
+          colors: {
+            appBg: '#0f172a',
+            panelBg: '#1e293b',
+            cyanTheme: '#06b6d4'
+          }
         }
       }
     }
@@ -25,135 +29,156 @@
 
   <style>
     body { font-family: 'Inter', 'Microsoft JhengHei', sans-serif; }
-    .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 6px; }
     .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: #64748b; }
-    .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); }
+    .glass-panel { background: rgba(30, 41, 59, 0.75); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); }
+    
     @keyframes slideIn { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .toast-enter { animation: slideIn 0.3s forwards; }
+    
+    /* Timeline styles */
+    .timeline-item { position: relative; padding-left: 1.5rem; padding-bottom: 1.25rem; border-left: 2px solid #334155; }
+    .timeline-item:last-child { border-left-color: transparent; }
+    .timeline-dot { position: absolute; left: -0.4rem; top: 0.2rem; width: 0.75rem; height: 0.75rem; border-radius: 50%; background: #06b6d4; border: 2px solid #1e293b; }
   </style>
 </head>
 <body class="bg-appBg text-slate-200 h-screen overflow-hidden flex flex-col">
 
-  <header class="h-16 flex items-center justify-between px-6 border-b border-slate-800 shrink-0">
+  <header class="h-16 flex items-center justify-between px-6 border-b border-slate-800 bg-slate-900 shrink-0">
     <div class="flex items-center gap-2">
-      <h1 class="text-xl font-bold text-white tracking-wide">Integrated Dashboard</h1>
-      <span class="text-xs text-slate-500 mt-1 hidden sm:block">Crafted by 勝全 · AI-assisted analytics</span>
+      <div class="p-1.5 bg-cyan-500 rounded text-slate-900"><i data-lucide="layout-dashboard" class="w-5 h-5"></i></div>
+      <h1 class="text-xl font-bold text-white tracking-wide ml-1">Team Sync Dashboard</h1>
     </div>
     <div class="flex items-center gap-4">
-      <span class="text-sm text-slate-400 flex items-center gap-1"><i data-lucide="calendar" class="w-4 h-4"></i> <span id="header-date"></span></span>
+      <span class="text-sm text-slate-300 flex items-center gap-1.5 font-medium"><i data-lucide="calendar" class="w-4 h-4 text-cyan-400"></i> <span id="header-date"></span></span>
       <div class="flex items-center gap-2">
-        <span class="text-[10px] bg-indigo-900/50 text-indigo-400 px-2 py-1 rounded border border-indigo-700 font-mono" id="dept-display">Dept: --</span>
-        <span class="text-[10px] bg-slate-800 text-cyan-400 px-2 py-1 rounded border border-slate-700 font-mono" id="user-id-display">Connecting...</span>
+        <span class="text-xs bg-indigo-900/40 text-indigo-300 px-2 py-1 rounded border border-indigo-700/50 font-mono shadow-inner" id="dept-display">Dept: --</span>
+        <span class="text-xs bg-slate-800 text-cyan-400 px-2 py-1 rounded border border-slate-700 font-mono shadow-inner" id="user-id-display">Connecting...</span>
       </div>
     </div>
   </header>
 
   <div class="flex flex-1 overflow-hidden">
     
-    <aside class="w-20 lg:w-24 border-r border-slate-800 flex flex-col items-center py-6 gap-6 shrink-0 bg-appBg z-10">
-      <button onclick="switchView('calendar')" class="nav-btn flex flex-col items-center gap-1.5 text-cyanTheme bg-cyanTheme/10 p-3 rounded-xl w-16 transition-colors" data-target="calendar">
+    <aside class="w-20 border-r border-slate-800 flex flex-col items-center py-6 gap-6 shrink-0 bg-slate-900/50 z-10">
+      <button onclick="switchView('calendar')" class="nav-btn flex flex-col items-center gap-1.5 text-cyanTheme bg-cyanTheme/10 p-3 rounded-xl w-14 transition-colors" data-target="calendar">
         <i data-lucide="calendar-days" class="w-6 h-6"></i>
-        <span class="text-[10px] font-bold">Calendar</span>
       </button>
-      <button onclick="switchView('tasks')" class="nav-btn flex flex-col items-center gap-1.5 text-slate-500 hover:text-slate-300 hover:bg-slate-800 p-3 rounded-xl w-16 transition-colors" data-target="tasks">
+      <button onclick="switchView('tasks')" class="nav-btn flex flex-col items-center gap-1.5 text-slate-500 hover:text-indigo-400 hover:bg-slate-800 p-3 rounded-xl w-14 transition-colors" data-target="tasks">
         <i data-lucide="check-square" class="w-6 h-6"></i>
-        <span class="text-[10px] font-bold">Tasks</span>
       </button>
       <div class="mt-auto flex flex-col gap-4">
-        <button onclick="openModal('settings-modal')" class="flex flex-col items-center gap-1.5 text-slate-500 hover:text-cyan-400 hover:bg-slate-800 p-3 rounded-xl w-16 transition-colors">
-          <i data-lucide="settings" class="w-6 h-6"></i>
-          <span class="text-[10px] font-bold">Settings</span>
+        <button onclick="window.location.reload()" class="flex flex-col items-center gap-1.5 text-slate-500 hover:text-emerald-400 hover:bg-slate-800 p-3 rounded-xl w-14 transition-colors" title="重新整理">
+          <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+        </button>
+        <button onclick="openModal('settings-modal')" class="flex flex-col items-center gap-1.5 text-slate-500 hover:text-amber-400 hover:bg-slate-800 p-3 rounded-xl w-14 transition-colors" title="系統設定">
+          <i data-lucide="settings" class="w-5 h-5"></i>
         </button>
       </div>
     </aside>
 
-    <main class="flex-1 p-4 lg:p-6 overflow-hidden flex flex-col relative">
+    <main class="flex-1 p-4 lg:p-6 overflow-hidden flex flex-col relative bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-blend-overlay">
       
       <div id="view-calendar" class="view-panel glass-panel rounded-2xl p-4 lg:p-6 flex-1 flex flex-col shadow-2xl h-full">
         <div class="flex justify-between items-center mb-6">
-          <h2 class="text-2xl font-bold text-white flex items-center gap-2" id="current-month-year">YYYY 年 MM 月</h2>
-          <div class="flex items-center gap-2 bg-slate-900/50 rounded-lg p-1 border border-slate-700">
-            <button onclick="prevMonth()" class="p-1.5 hover:bg-slate-700 rounded text-slate-400"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
-            <button onclick="goToToday()" class="px-2 font-bold text-sm hover:text-cyan-400 transition-colors">今天</button>
-            <button onclick="nextMonth()" class="p-1.5 hover:bg-slate-700 rounded text-slate-400"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+          <h2 class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 flex items-center gap-2" id="current-month-year">YYYY 年 MM 月</h2>
+          <div class="flex items-center gap-1 bg-slate-900/80 rounded-lg p-1 border border-slate-700 shadow-inner">
+            <button onclick="prevMonth()" class="p-1.5 hover:bg-slate-700 rounded text-slate-400 transition-colors"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+            <button onclick="goToToday()" class="px-3 py-1 font-bold text-sm hover:text-cyan-400 hover:bg-slate-800 rounded transition-colors">今天</button>
+            <button onclick="nextMonth()" class="p-1.5 hover:bg-slate-700 rounded text-slate-400 transition-colors"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
           </div>
         </div>
-        <div class="flex-1 border border-slate-700 bg-slate-800/50 rounded-xl overflow-hidden flex flex-col">
-          <div class="grid grid-cols-7 border-b border-slate-700 bg-slate-800/80 shrink-0">
-            <div class="py-2.5 text-center text-xs font-bold text-red-400">週日</div>
-            <div class="py-2.5 text-center text-xs font-bold text-slate-400">週一</div>
-            <div class="py-2.5 text-center text-xs font-bold text-slate-400">週二</div>
-            <div class="py-2.5 text-center text-xs font-bold text-slate-400">週三</div>
-            <div class="py-2.5 text-center text-xs font-bold text-slate-400">週四</div>
-            <div class="py-2.5 text-center text-xs font-bold text-slate-400">週五</div>
-            <div class="py-2.5 text-center text-xs font-bold text-red-400">週六</div>
+        <div class="flex-1 border border-slate-700 bg-slate-900/60 rounded-xl overflow-hidden flex flex-col shadow-inner">
+          <div class="grid grid-cols-7 border-b border-slate-700 bg-slate-800/90 shrink-0">
+            <div class="py-3 text-center text-xs font-bold text-rose-400">週日</div>
+            <div class="py-3 text-center text-xs font-bold text-slate-300">週一</div>
+            <div class="py-3 text-center text-xs font-bold text-slate-300">週二</div>
+            <div class="py-3 text-center text-xs font-bold text-slate-300">週三</div>
+            <div class="py-3 text-center text-xs font-bold text-slate-300">週四</div>
+            <div class="py-3 text-center text-xs font-bold text-slate-300">週五</div>
+            <div class="py-3 text-center text-xs font-bold text-rose-400">週六</div>
           </div>
-          <div id="calendar-grid" class="grid grid-cols-7 auto-rows-fr flex-1 bg-slate-900/20 overflow-y-auto custom-scrollbar"></div>
+          <div id="calendar-grid" class="grid grid-cols-7 auto-rows-fr flex-1 bg-slate-900/40 overflow-y-auto custom-scrollbar"></div>
         </div>
       </div>
 
-      <div id="view-tasks" class="view-panel glass-panel rounded-2xl p-4 lg:p-6 flex-1 flex flex-col shadow-2xl h-full hidden overflow-y-auto custom-scrollbar">
-        <div class="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
-          <h2 class="text-2xl font-bold text-white flex items-center gap-2">任務管理中心 (Task Center)</h2>
+      <div id="view-tasks" class="view-panel flex-1 flex flex-col h-full hidden gap-4">
+        
+        <div class="flex justify-between items-center shrink-0 glass-panel rounded-xl p-4 shadow-lg">
+          <h2 class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400 flex items-center gap-2">任務管理與歷程</h2>
           <div class="flex gap-2">
-            <button onclick="document.getElementById('add-task-form').classList.toggle('hidden')" class="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">+ 新增任務</button>
-            <button onclick="importRoutineTasks()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded-lg text-sm transition-colors">匯入</button>
-            <button onclick="exportRoutineTasks()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded-lg text-sm transition-colors">匯出</button>
+            <button onclick="document.getElementById('add-task-form').classList.toggle('hidden')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-md flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i> 新增任務</button>
+            <button onclick="importRoutineTasks()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded-lg text-sm transition-colors border border-slate-600 shadow-sm"><i data-lucide="upload" class="w-4 h-4"></i></button>
+            <button onclick="exportRoutineTasks()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded-lg text-sm transition-colors border border-slate-600 shadow-sm"><i data-lucide="download" class="w-4 h-4"></i></button>
+            <button onclick="resetMonthly()" class="bg-amber-600/20 hover:bg-amber-600/40 text-amber-400 border border-amber-600/50 px-3 py-2 rounded-lg text-sm transition-colors shadow-sm flex items-center gap-1 font-bold" title="重置所有每月任務狀態"><i data-lucide="rotate-ccw" class="w-4 h-4"></i> 月初重置</button>
             <input type="file" id="import-file-input" class="hidden" accept=".json">
           </div>
         </div>
 
-        <div id="add-task-form" class="hidden mb-6 bg-slate-800 p-4 rounded-xl border border-slate-600">
+        <div id="add-task-form" class="hidden shrink-0 bg-indigo-900/20 p-4 rounded-xl border border-indigo-700/50 shadow-inner">
             <div class="flex gap-4 mb-3">
-                <input type="text" id="new-task-name" placeholder="任務名稱" class="flex-1 p-2 text-sm bg-slate-900 border border-slate-700 rounded-lg focus:border-cyanTheme text-white">
-                <select id="new-task-freq" class="w-32 p-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-white">
-                    <option value="Daily">每日</option>
-                    <option value="Monthly">每月</option>
+                <input type="text" id="new-task-name" placeholder="任務名稱 (例如: 確認報表)" class="flex-1 p-2 text-sm bg-slate-900 border border-indigo-500/50 rounded-lg focus:border-indigo-400 text-white outline-none">
+                <select id="new-task-freq" class="w-32 p-2 text-sm bg-slate-900 border border-indigo-500/50 rounded-lg text-white outline-none">
+                    <option value="Daily">每日 (Daily)</option>
+                    <option value="Monthly">每月 (Monthly)</option>
                 </select>
-                <input type="text" id="new-task-cat" placeholder="分類 (例如: 報表)" class="w-40 p-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-white">
+                <input type="text" id="new-task-cat" placeholder="分類 (例如: 行政)" class="w-40 p-2 text-sm bg-slate-900 border border-indigo-500/50 rounded-lg text-white outline-none">
             </div>
-            <button onclick="addRoutineTask()" class="w-full py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg text-sm transition-colors">儲存任務</button>
+            <button onclick="addRoutineTask()" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg text-sm transition-colors shadow-md">儲存任務</button>
         </div>
 
-        <div id="routine-tasks-list" class="flex-1 space-y-4 pr-2 pb-4"></div>
+        <div class="flex-1 flex flex-col lg:flex-row gap-4 min-h-0">
+          
+          <div class="flex-1 glass-panel rounded-xl p-4 flex flex-col shadow-lg border border-slate-700">
+             <h3 class="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2 pb-2 border-b border-slate-700/50"><i data-lucide="list-todo" class="w-4 h-4 text-cyan-400"></i> 待辦清單</h3>
+             <div id="routine-tasks-list" class="flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-2 pb-2">
+                </div>
+          </div>
+
+          <div class="flex-1 glass-panel rounded-xl p-4 flex flex-col shadow-lg border border-slate-700">
+             <h3 class="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2 pb-2 border-b border-slate-700/50"><i data-lucide="clock" class="w-4 h-4 text-emerald-400"></i> 今日歷程 (Timeline)</h3>
+             <div id="daily-log-timeline" class="flex-1 overflow-y-auto custom-scrollbar pl-2 pr-2 pt-2">
+                </div>
+          </div>
+
+        </div>
       </div>
 
     </main>
 
-    <aside id="right-panel" class="w-[300px] lg:w-[340px] p-6 border-l border-slate-800 overflow-y-auto custom-scrollbar glass-panel shadow-2xl shrink-0 z-10 transition-all">
-      <h2 class="text-xl font-bold text-white mb-6">快速控制台</h2>
-
-      <div class="mb-8 bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
-        <h3 class="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">快速紀錄臨時事項</h3>
-        <select id="adhoc-category" class="w-full p-2 mb-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-200">
+    <aside id="right-panel" class="w-[300px] lg:w-[340px] p-6 border-l border-slate-800 bg-slate-900 overflow-y-auto custom-scrollbar shrink-0 z-10 transition-all shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)]">
+      
+      <div class="mb-8">
+        <h3 class="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2 border-b border-slate-700 pb-2"><i data-lucide="zap" class="w-4 h-4 text-amber-400"></i> 快速紀錄 (Ad-hoc)</h3>
+        <select id="adhoc-category" class="w-full p-2.5 mb-2 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 outline-none focus:border-cyan-500 transition-colors">
           <option value="一般">📌 一般事項</option>
           <option value="會議">🗣️ 會議溝通</option>
           <option value="維修">🔧 維修處理</option>
           <option value="開發">💻 專案開發</option>
         </select>
-        <input type="text" id="adhoc-requester" placeholder="需求人員(選填)" class="w-full p-2 mb-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-200">
-        <input type="text" id="adhoc-task-description" placeholder="發生了什麼事？" onkeydown="if(event.key === 'Enter') logAdHocTask()" class="w-full p-2 text-sm bg-slate-900 border border-slate-700 rounded-lg mb-3 text-slate-200">
-        <button onclick="logAdHocTask()" class="w-full py-2 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold rounded-lg shadow-md transition-all text-sm">
-          紀錄送出 (Log Ad-hoc)
+        <input type="text" id="adhoc-requester" placeholder="提需求人員 (選填)" class="w-full p-2.5 mb-2 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 outline-none focus:border-cyan-500 transition-colors">
+        <input type="text" id="adhoc-task-description" placeholder="發生了什麼事？" onkeydown="if(event.key === 'Enter') logAdHocTask()" class="w-full p-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg mb-3 text-slate-200 outline-none focus:border-cyan-500 transition-colors">
+        <button onclick="logAdHocTask()" class="w-full py-2.5 bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-500 hover:to-orange-400 text-white font-bold rounded-lg shadow-lg transition-all text-sm tracking-wider">
+          立即紀錄送出
         </button>
       </div>
 
-      <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 mt-auto">
-        <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">今日工作比例分析</h3>
-        <div class="flex flex-col items-center gap-4">
-          <div class="w-32 h-32 relative">
+      <div class="mt-auto">
+        <h3 class="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2 border-b border-slate-700 pb-2"><i data-lucide="pie-chart" class="w-4 h-4 text-indigo-400"></i> 工作分析</h3>
+        <div class="bg-slate-800/80 p-5 rounded-2xl border border-slate-700 shadow-inner flex flex-col items-center gap-5">
+          <div class="w-36 h-36 relative">
              <canvas id="workChart"></canvas>
           </div>
-          <div class="w-full space-y-2 mt-2">
-            <div class="flex justify-between items-center text-sm bg-slate-900/50 p-2 rounded">
-              <span class="flex items-center gap-2 text-slate-300"><span class="w-2.5 h-2.5 rounded-full bg-blue-400"></span> 例行任務</span>
-              <span class="font-bold text-white" id="stat-routine">0</span>
+          <div class="w-full space-y-2">
+            <div class="flex justify-between items-center text-sm bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+              <span class="flex items-center gap-2 text-slate-300"><span class="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]"></span> 例行任務</span>
+              <span class="font-black text-white text-base" id="stat-routine">0</span>
             </div>
-            <div class="flex justify-between items-center text-sm bg-slate-900/50 p-2 rounded">
-              <span class="flex items-center gap-2 text-slate-300"><span class="w-2.5 h-2.5 rounded-full bg-red-400"></span> 臨時事項</span>
-              <span class="font-bold text-white" id="stat-adhoc">0</span>
+            <div class="flex justify-between items-center text-sm bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+              <span class="flex items-center gap-2 text-slate-300"><span class="w-3 h-3 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]"></span> 臨時事項</span>
+              <span class="font-black text-white text-base" id="stat-adhoc">0</span>
             </div>
           </div>
         </div>
@@ -163,22 +188,23 @@
 
   <div id="settings-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-200">
     <div class="bg-slate-800 border border-slate-600 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
-      <div class="px-5 py-4 flex justify-between items-center border-b border-slate-700 bg-slate-900/50">
-        <h3 class="text-base font-bold text-white flex items-center gap-2"><i data-lucide="settings" class="w-4 h-4 text-cyan-500"></i> 系統設定</h3>
-        <button onclick="closeModal('settings-modal')" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+      <div class="px-5 py-4 flex justify-between items-center border-b border-slate-700 bg-slate-900/80">
+        <h3 class="text-base font-bold text-white flex items-center gap-2"><i data-lucide="settings" class="w-5 h-5 text-amber-400"></i> 系統設定</h3>
+        <button onclick="closeModal('settings-modal')" class="text-slate-400 hover:text-white transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
       </div>
-      <div class="p-5 space-y-4">
+      <div class="p-5 space-y-5">
         <div>
-          <label class="block text-xs font-bold text-slate-400 mb-1">自訂帳號 ID (跨裝置同步任務用)</label>
-          <input type="text" id="setting-uid" class="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-sm text-white focus:border-cyan-500 outline-none" placeholder="留白則使用隨機匿名ID">
+          <label class="block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wider">自訂帳號 ID</label>
+          <input type="text" id="setting-uid" class="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-sm text-white focus:border-cyan-500 outline-none" placeholder="輸入固定名稱以跨裝置同步">
+          <p class="text-[10px] text-slate-500 mt-1">留白則使用隨機匿名ID，更換裝置會遺失資料。</p>
         </div>
         <div>
-          <label class="block text-xs font-bold text-slate-400 mb-1">行事曆部門代號</label>
+          <label class="block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wider">行事曆部門代號</label>
           <input type="text" id="setting-dept" class="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-sm text-white focus:border-cyan-500 outline-none" placeholder="例如: public">
         </div>
-        <div class="pt-2 border-t border-slate-700 flex justify-end gap-2">
-          <button onclick="closeModal('settings-modal')" class="px-4 py-2 text-sm font-bold text-slate-300 hover:bg-slate-700 rounded-lg">取消</button>
-          <button onclick="saveSettings()" class="px-6 py-2 text-sm font-bold bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg shadow-md">儲存並重啟</button>
+        <div class="pt-3 border-t border-slate-700 flex justify-end gap-3">
+          <button onclick="closeModal('settings-modal')" class="px-4 py-2 text-sm font-bold text-slate-300 hover:bg-slate-700 rounded-lg transition-colors">取消</button>
+          <button onclick="saveSettings()" class="px-6 py-2 text-sm font-bold bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-lg shadow-md transition-colors">儲存並重啟</button>
         </div>
       </div>
     </div>
@@ -186,9 +212,9 @@
 
   <div id="event-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-200">
     <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
-      <div class="px-5 py-4 flex justify-between items-center border-b border-slate-700 bg-slate-900/50">
-        <h3 class="text-base font-bold text-white flex items-center gap-2"><i data-lucide="plus" class="w-4 h-4 text-cyan-500"></i> 新增行事曆事項</h3>
-        <button onclick="closeModal('event-modal')" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+      <div class="px-5 py-4 flex justify-between items-center border-b border-slate-700 bg-slate-900/80">
+        <h3 id="event-modal-title" class="text-base font-bold text-white flex items-center gap-2"><i data-lucide="calendar-plus" class="w-5 h-5 text-cyan-400"></i> 行事曆排程</h3>
+        <button onclick="closeModal('event-modal')" class="text-slate-400 hover:text-white transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
       </div>
       <form id="event-form" class="p-5 space-y-4">
         <div class="flex gap-4">
@@ -201,19 +227,37 @@
             <input required type="text" id="form-end-date" class="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-sm text-white focus:border-cyan-500 outline-none">
           </div>
         </div>
+        
+        <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700">
+            <div class="flex items-center gap-2 mb-3 cursor-pointer">
+                <input type="checkbox" id="form-is-allday" checked onchange="toggleTimeInputs()" class="w-4 h-4 rounded border-slate-500 bg-slate-800 checked:bg-cyan-500 cursor-pointer">
+                <label for="form-is-allday" class="text-sm font-bold text-slate-300 cursor-pointer select-none">全天事件</label>
+            </div>
+            <div id="time-inputs" class="flex gap-4 hidden">
+                <div class="flex-1">
+                    <label class="block text-[10px] text-slate-500 mb-1">開始時間</label>
+                    <input type="time" id="form-start-time" value="09:00" class="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-white outline-none focus:border-cyan-500">
+                </div>
+                <div class="flex-1">
+                    <label class="block text-[10px] text-slate-500 mb-1">結束時間</label>
+                    <input type="time" id="form-end-time" value="17:00" class="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-white outline-none focus:border-cyan-500">
+                </div>
+            </div>
+        </div>
+
         <div class="flex gap-4">
           <div class="flex-1">
             <label class="block text-xs font-bold text-slate-400 mb-1">負責人</label>
             <input required type="text" id="form-name" class="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-sm text-white focus:border-cyan-500 outline-none">
           </div>
           <div class="flex-1">
-            <label class="block text-xs font-bold text-slate-400 mb-1">標題</label>
+            <label class="block text-xs font-bold text-slate-400 mb-1">事項標題</label>
             <input required type="text" id="form-title" class="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-sm text-white focus:border-cyan-500 outline-none">
           </div>
         </div>
-        <div class="flex justify-end gap-2 pt-2 border-t border-slate-700">
-          <button type="button" onclick="closeModal('event-modal')" class="px-4 py-2 text-sm font-bold text-slate-300 hover:bg-slate-700 rounded-lg">取消</button>
-          <button type="submit" class="px-6 py-2 text-sm font-bold bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg shadow-md">儲存</button>
+        <div class="flex justify-end gap-3 pt-3 border-t border-slate-700">
+          <button type="button" onclick="closeModal('event-modal')" class="px-4 py-2 text-sm font-bold text-slate-300 hover:bg-slate-700 rounded-lg transition-colors">取消</button>
+          <button type="submit" class="px-6 py-2 text-sm font-bold bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg shadow-md transition-colors">儲存排程</button>
         </div>
       </form>
     </div>
@@ -224,7 +268,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, setDoc, onSnapshot, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getFirestore, doc, setDoc, onSnapshot, collection, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     const LOCAL_FIREBASE_CONFIG = {
         apiKey: "AIzaSyAXnSDK_kY4Aa8XvL0M_Md9kA4Wdow_Uvs",
@@ -261,9 +305,9 @@
         openCategories: new Set()
     };
 
-    // --- UI Helpers ---
     const formatToYYYYMMDD = (d) => `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
     const formatToDash = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const formatTimeStr = (dateObj) => dateObj.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
     
     window.appState.todayStr = formatToYYYYMMDD(new Date());
     document.getElementById('header-date').textContent = formatToDash(new Date());
@@ -271,8 +315,8 @@
     window.showToast = (message, type = 'success') => {
         const container = document.getElementById('toast-container');
         const toast = document.createElement('div');
-        const bgColor = type === 'success' ? 'bg-slate-800 border border-cyan-500' : 'bg-red-900 border border-red-500';
-        toast.className = `flex items-center gap-2.5 px-4 py-3 rounded-lg shadow-xl font-bold text-sm text-white toast-enter pointer-events-auto ${bgColor}`;
+        const bgColor = type === 'success' ? 'bg-slate-800 border-l-4 border-cyan-500' : 'bg-rose-900 border-l-4 border-rose-500';
+        toast.className = `flex items-center gap-2.5 px-4 py-3 rounded shadow-2xl font-bold text-sm text-white toast-enter pointer-events-auto ${bgColor}`;
         toast.innerHTML = `<span>${message}</span>`;
         container.appendChild(toast);
         setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
@@ -282,7 +326,6 @@
         const modal = document.getElementById(id);
         modal.classList.remove('hidden');
         setTimeout(() => modal.classList.remove('opacity-0'), 10);
-        
         if (id === 'settings-modal') {
             document.getElementById('setting-uid').value = localStorage.getItem('custom_user_id') || '';
             document.getElementById('setting-dept').value = window.appState.department;
@@ -293,14 +336,10 @@
         modal.classList.add('opacity-0');
         setTimeout(() => modal.classList.add('hidden'), 200);
     };
-
     window.saveSettings = () => {
         const uid = document.getElementById('setting-uid').value.trim();
         const dept = document.getElementById('setting-dept').value.trim() || 'public';
-        
-        if (uid) localStorage.setItem('custom_user_id', uid);
-        else localStorage.removeItem('custom_user_id');
-        
+        if (uid) localStorage.setItem('custom_user_id', uid); else localStorage.removeItem('custom_user_id');
         localStorage.setItem('calendar_saved_dept', dept);
         window.location.reload();
     };
@@ -308,13 +347,9 @@
     window.switchView = (targetView) => {
         document.querySelectorAll('.view-panel').forEach(el => el.classList.add('hidden'));
         document.getElementById(`view-${targetView}`).classList.remove('hidden');
-        
         document.querySelectorAll('.nav-btn').forEach(btn => {
-            if (btn.dataset.target === targetView) {
-                btn.className = 'nav-btn flex flex-col items-center gap-1.5 text-cyanTheme bg-cyanTheme/10 p-3 rounded-xl w-16 transition-colors';
-            } else {
-                btn.className = 'nav-btn flex flex-col items-center gap-1.5 text-slate-500 hover:text-slate-300 hover:bg-slate-800 p-3 rounded-xl w-16 transition-colors';
-            }
+            if (btn.dataset.target === targetView) btn.className = 'nav-btn flex flex-col items-center gap-1.5 text-cyanTheme bg-cyanTheme/10 p-3 rounded-xl w-14 transition-colors';
+            else btn.className = 'nav-btn flex flex-col items-center gap-1.5 text-slate-500 hover:text-indigo-400 hover:bg-slate-800 p-3 rounded-xl w-14 transition-colors';
         });
     };
 
@@ -322,44 +357,39 @@
         const content = document.getElementById(`cat-content-${catId}`);
         const icon = document.getElementById(`cat-icon-${catId}`);
         if (content.classList.contains('hidden')) {
-            content.classList.remove('hidden');
-            icon.classList.add('rotate-180');
-            window.appState.openCategories.add(catId);
+            content.classList.remove('hidden'); icon.classList.add('rotate-180'); window.appState.openCategories.add(catId);
         } else {
-            content.classList.add('hidden');
-            icon.classList.remove('rotate-180');
-            window.appState.openCategories.delete(catId);
+            content.classList.add('hidden'); icon.classList.remove('rotate-180'); window.appState.openCategories.delete(catId);
         }
     };
+    window.toggleTimeInputs = () => {
+        const isAllDay = document.getElementById('form-is-allday').checked;
+        const timeContainer = document.getElementById('time-inputs');
+        if(isAllDay) timeContainer.classList.add('hidden'); else timeContainer.classList.remove('hidden');
+    };
 
-    // --- Chart ---
     Chart.defaults.color = '#cbd5e1';
     const initChart = () => {
         const ctx = document.getElementById('workChart').getContext('2d');
         window.appState.statsChart = new Chart(ctx, {
             type: 'doughnut',
-            data: { labels: ['Routine', 'Ad-hoc'], datasets: [{ data: [0, 0], backgroundColor: ['#60a5fa', '#f87171'], borderWidth: 0, cutout: '75%' }] },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { backgroundColor: 'rgba(30, 41, 59, 0.9)' } } }
+            data: { labels: ['Routine', 'Ad-hoc'], datasets: [{ data: [0, 0], backgroundColor: ['#3b82f6', '#f59e0b'], borderWidth: 0, cutout: '75%' }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.9)' } } }
         });
     };
     const updateChart = () => {
         if (!window.appState.statsChart) return;
         let routineCount = 0; let adhocCount = 0;
-        window.appState.dailyLogs.forEach(log => {
-            if (log.type === 'Routine' || log.type === 'Monthly') routineCount++; else adhocCount++;
-        });
+        window.appState.dailyLogs.forEach(log => { if (log.type === 'Routine' || log.type === 'Monthly') routineCount++; else adhocCount++; });
         window.appState.statsChart.data.datasets[0].data = [routineCount, adhocCount];
         window.appState.statsChart.update();
-        document.getElementById('stat-routine').textContent = routineCount;
-        document.getElementById('stat-adhoc').textContent = adhocCount;
+        document.getElementById('stat-routine').textContent = routineCount; document.getElementById('stat-adhoc').textContent = adhocCount;
     };
 
-    // --- Calendar System ---
     const setupCalendarListeners = () => {
         const deptKey = window.appState.department.toLowerCase();
         document.getElementById('dept-display').textContent = `Dept: ${deptKey}`;
         const eventsRef = collection(db, 'artifacts', window.appState.calGlobalAppId, 'public', 'data', `events_${deptKey}`);
-        
         window.appState.unsubEvents = onSnapshot(eventsRef, (snapshot) => {
             window.appState.events = [];
             snapshot.forEach(doc => window.appState.events.push({ id: doc.id, ...doc.data() }));
@@ -388,39 +418,53 @@
         days.forEach(dayObj => {
             const dateStr = formatToYYYYMMDD(dayObj.date);
             const isToday = dateStr === window.appState.todayStr;
-            const bgClass = dayObj.isCurrent ? 'bg-transparent' : 'bg-slate-900/40 opacity-60';
+            const bgClass = dayObj.isCurrent ? 'bg-transparent' : 'bg-slate-900/60 opacity-50';
             
             const cell = document.createElement('div');
-            cell.className = `min-h-[100px] border-r border-b border-slate-700 p-1.5 cursor-pointer hover:bg-slate-700/50 transition-colors flex flex-col ${bgClass}`;
+            cell.className = `min-h-[120px] border-r border-b border-slate-700/80 p-1.5 cursor-pointer hover:bg-slate-800/80 transition-colors flex flex-col ${bgClass}`;
             cell.onclick = () => {
-                document.getElementById('form-start-date')._flatpickr.setDate(formatToDash(dayObj.date));
-                document.getElementById('form-end-date')._flatpickr.setDate(formatToDash(dayObj.date));
+                const ds = formatToDash(dayObj.date);
+                document.getElementById('form-start-date')._flatpickr.setDate(ds);
+                document.getElementById('form-end-date')._flatpickr.setDate(ds);
+                document.getElementById('form-is-allday').checked = true;
+                toggleTimeInputs();
                 openModal('event-modal');
             };
             
             let eventsHtml = window.appState.events.filter(e => dateStr >= e.dateString && dateStr <= (e.endDateString || e.dateString))
-                .map(evt => `<div class="px-1.5 py-0.5 rounded text-[10px] font-bold truncate mb-1 shadow-sm bg-cyan-600/80 text-white">${evt.name}: ${evt.title}</div>`).join('');
+                .sort((a,b) => (a.isAllDay === b.isAllDay) ? 0 : a.isAllDay ? -1 : 1)
+                .map(evt => {
+                    const timeTag = evt.isAllDay ? '' : `<span class="font-black opacity-70 mr-1">${evt.startTime}</span>`;
+                    const colorClass = evt.isAllDay ? 'bg-indigo-500 text-white' : 'bg-slate-800 border-l-2 border-indigo-400 text-indigo-300';
+                    return `<div class="px-1.5 py-0.5 rounded text-[10px] font-bold truncate mb-1 shadow-sm ${colorClass}">${timeTag}${evt.name}: ${evt.title}</div>`;
+                }).join('');
 
-            cell.innerHTML = `<div class="flex justify-center mb-1"><div class="w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${isToday ? 'bg-cyan-500 text-white shadow-md' : 'text-slate-400'}">${dayObj.date.getDate()}</div></div><div class="flex-1 overflow-y-auto custom-scrollbar">${eventsHtml}</div>`;
+            cell.innerHTML = `<div class="flex justify-center mb-1.5"><div class="w-7 h-7 flex items-center justify-center rounded-full text-[11px] font-black ${isToday ? 'bg-cyan-500 text-slate-900 shadow-[0_0_10px_rgba(6,182,212,0.8)]' : 'text-slate-400'}">${dayObj.date.getDate()}</div></div><div class="flex-1 overflow-y-auto custom-scrollbar">${eventsHtml}</div>`;
             grid.appendChild(cell);
         });
     };
 
     document.getElementById('event-form').addEventListener('submit', async (e) => {
         e.preventDefault();
+        const sStr = document.getElementById('form-start-date').value.replace(/-/g, '');
+        const eStr = document.getElementById('form-end-date').value.replace(/-/g, '');
+        const isAllDay = document.getElementById('form-is-allday').checked;
+        
         const payload = {
-            dateString: document.getElementById('form-start-date').value.replace(/-/g, ''),
-            endDateString: document.getElementById('form-end-date').value.replace(/-/g, ''),
+            dateString: sStr,
+            endDateString: eStr < sStr ? sStr : eStr,
             title: document.getElementById('form-title').value.trim(),
             name: document.getElementById('form-name').value.trim(),
-            isAllDay: true, categoryId: 'default', updatedAt: new Date().toISOString()
+            isAllDay: isAllDay,
+            startTime: isAllDay ? null : document.getElementById('form-start-time').value,
+            endTime: isAllDay ? null : document.getElementById('form-end-time').value,
+            categoryId: 'default', updatedAt: new Date().toISOString()
         };
         await addDoc(collection(db, 'artifacts', window.appState.calGlobalAppId, 'public', 'data', `events_${window.appState.department.toLowerCase()}`), payload);
-        showToast('已建立事項');
+        showToast('已建立排程');
         closeModal('event-modal');
     });
 
-    // --- Daily Tasks System ---
     const getLogDocRef = (path) => doc(db, 'artifacts', window.appState.logAppId, 'users', window.appState.userId, 'config', path);
     const getLogColRef = (dateStr) => collection(db, 'artifacts', window.appState.logAppId, 'users', window.appState.userId, 'daily_logs', dateStr, 'entries');
 
@@ -440,7 +484,8 @@
                 window.appState.dailyLogs.push({ id: d.id, ...data });
                 if ((data.type === 'Routine' || data.type === 'Monthly') && data.taskName) window.appState.completedRoutineTaskNames.add(data.taskName);
             });
-            renderRoutineTasks(); updateChart();
+            window.appState.dailyLogs.sort((a, b) => b.timestamp - a.timestamp);
+            renderRoutineTasks(); renderTimeline(); updateChart();
         });
     };
 
@@ -456,13 +501,8 @@
 
     window.exportRoutineTasks = () => {
         if (window.appState.routineTasks.length === 0) return showToast('無資料可匯出', 'error');
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob([JSON.stringify(window.appState.routineTasks, null, 2)], { type: 'application/json' }));
-        a.download = `tasks_${formatToYYYYMMDD(new Date())}.json`;
-        a.click();
-        showToast('匯出成功');
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(window.appState.routineTasks, null, 2)], { type: 'application/json' })); a.download = `tasks_${formatToYYYYMMDD(new Date())}.json`; a.click(); showToast('匯出成功');
     };
-
     window.importRoutineTasks = () => {
         const input = document.getElementById('import-file-input');
         input.onchange = (e) => {
@@ -470,11 +510,9 @@
             reader.onload = async (event) => {
                 try {
                     const imported = JSON.parse(event.target.result);
-                    const map = new Map();
-                    window.appState.routineTasks.forEach(t => map.set(t.name, t));
+                    const map = new Map(); window.appState.routineTasks.forEach(t => map.set(t.name, t));
                     imported.forEach(t => { if (t.name && !map.has(t.name)) map.set(t.name, { name: t.name.trim(), category: t.category||'未分類', frequency: t.frequency||'Daily' }); });
-                    await setDoc(getLogDocRef('routine_tasks'), { tasks: Array.from(map.values()) });
-                    showToast('匯入成功');
+                    await setDoc(getLogDocRef('routine_tasks'), { tasks: Array.from(map.values()) }); showToast('匯入成功');
                 } catch (err) { showToast('格式錯誤', 'error'); }
             };
             reader.readAsText(e.target.files[0]);
@@ -482,83 +520,129 @@
         input.click();
     };
 
+    window.resetMonthly = async () => {
+        if(!confirm('確定要將所有「每月任務」重置為未完成狀態嗎？')) return;
+        await setDoc(getLogDocRef('monthly_status'), {});
+        showToast('所有每月任務進度已重置');
+    };
+
+    const handleTaskCompletion = async (taskName, isMonthly, category) => {
+        if (isMonthly) {
+            const newStatus = { ...window.appState.monthlyTaskStatus, [taskName]: Date.now() };
+            await setDoc(getLogDocRef('monthly_status'), newStatus);
+        }
+        await addDoc(getLogColRef(formatToDash(new Date())), {
+            type: isMonthly ? 'Monthly' : 'Routine', description: `完成: ${taskName}`, taskName: taskName, category: category,
+            timestamp: Date.now(), timeString: formatTimeStr(new Date())
+        });
+        showToast('任務已紀錄完成！');
+    };
+
+    window.deleteLog = async (logId, taskName, type) => {
+        await deleteDoc(doc(getLogColRef(formatToDash(new Date())), logId));
+        if (type === 'Monthly' && taskName) {
+            const newStatus = { ...window.appState.monthlyTaskStatus };
+            delete newStatus[taskName];
+            await setDoc(getLogDocRef('monthly_status'), newStatus);
+        }
+        showToast('紀錄已刪除，任務狀態還原', 'error');
+    };
+
     const renderRoutineTasks = () => {
         const container = document.getElementById('routine-tasks-list');
         container.innerHTML = '';
-        if (window.appState.routineTasks.length === 0) {
-            container.innerHTML = `<div class="text-xs text-slate-500 text-center py-8">目前尚無任務，請點擊上方新增</div>`;
-            return;
-        }
+        if (window.appState.routineTasks.length === 0) { container.innerHTML = `<div class="text-xs text-slate-500 text-center py-8">目前尚無任務</div>`; return; }
 
-        // 依類別分組
         const tasksByCategory = window.appState.routineTasks.reduce((acc, task) => {
             const cat = task.category || '未分類';
-            if (!acc[cat]) acc[cat] = [];
-            acc[cat].push(task);
-            return acc;
+            if (!acc[cat]) acc[cat] = []; acc[cat].push(task); return acc;
         }, {});
 
         Object.keys(tasksByCategory).forEach((category, catIdx) => {
-            const tasks = tasksByCategory[category];
-            const catId = `cat-${catIdx}`;
+            const tasks = tasksByCategory[category]; const catId = `cat-${catIdx}`;
             let completedCount = 0;
-            
             tasks.forEach(task => {
                 if (task.frequency === 'Monthly' && window.appState.monthlyTaskStatus[task.name]) completedCount++;
                 else if (task.frequency !== 'Monthly' && window.appState.completedRoutineTaskNames.has(task.name)) completedCount++;
             });
-            
             const isAllDone = completedCount === tasks.length;
-            const isOpened = window.appState.openCategories.has(catId) || catIdx === 0; // 預設展開第一個
+            const isOpened = window.appState.openCategories.has(catId) || catIdx === 0;
 
             const catEl = document.createElement('div');
-            catEl.className = "mb-3 bg-slate-800/50 rounded-lg border border-slate-700/80 overflow-hidden";
-            
-            // Header (Accordion Toggle)
+            catEl.className = "mb-3 bg-slate-800/80 rounded-xl border border-slate-700 overflow-hidden shadow-sm";
             catEl.innerHTML = `
-                <div class="p-3 flex items-center justify-between cursor-pointer hover:bg-slate-700/50 transition-colors" onclick="toggleAccordion('${catId}')">
+                <div class="p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-700/80 transition-colors" onclick="toggleAccordion('${catId}')">
                     <div class="flex items-center gap-2">
-                        <span class="font-bold text-sm text-white">${category}</span>
-                        <span class="text-[10px] ${isAllDone ? 'bg-cyan-900 text-cyan-400' : 'bg-slate-700 text-slate-400'} px-2 py-0.5 rounded-full">${completedCount}/${tasks.length}</span>
+                        <span class="font-bold text-sm text-slate-200">${category}</span>
+                        <span class="text-[10px] ${isAllDone ? 'bg-emerald-900/60 text-emerald-400 border border-emerald-800' : 'bg-slate-900 text-slate-400 border border-slate-700'} px-2 py-0.5 rounded-full font-mono">${completedCount}/${tasks.length}</span>
                     </div>
                     <i id="cat-icon-${catId}" data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transform transition-transform ${isOpened ? 'rotate-180' : ''}"></i>
                 </div>
-                <div id="cat-content-${catId}" class="p-2 space-y-2 border-t border-slate-700/50 ${isOpened ? '' : 'hidden'}"></div>
+                <div id="cat-content-${catId}" class="p-2 space-y-2 border-t border-slate-700/80 bg-slate-900/40 ${isOpened ? '' : 'hidden'}"></div>
             `;
             container.appendChild(catEl);
-
             const contentEl = catEl.querySelector(`#cat-content-${catId}`);
             
-            // Render Tasks in Category
             tasks.forEach((task, tIdx) => {
                 const isMonthly = task.frequency === 'Monthly';
                 const isDone = isMonthly ? !!window.appState.monthlyTaskStatus[task.name] : window.appState.completedRoutineTaskNames.has(task.name);
                 const inputId = `chk-${catIdx}-${tIdx}`;
                 
                 const tEl = document.createElement('div');
-                tEl.className = `p-2.5 rounded-md flex items-start gap-3 transition-all ${isDone ? 'bg-slate-900/50 opacity-60' : 'bg-slate-800 hover:bg-slate-700'}`;
+                tEl.className = `p-3 rounded-lg flex items-start gap-3 transition-all border ${isDone ? 'bg-emerald-900/10 border-emerald-900/50 opacity-50' : 'bg-slate-800 border-slate-700 hover:border-cyan-500/50 hover:bg-slate-700'}`;
                 
                 tEl.innerHTML = `
                     <div class="relative flex items-center shrink-0 mt-0.5">
-                        <input type="checkbox" id="${inputId}" class="peer h-4 w-4 cursor-pointer appearance-none rounded border-slate-500 checked:bg-cyan-500 checked:border-cyan-500 bg-slate-900 transition-colors" ${isDone ? 'checked disabled' : ''}>
+                        <input type="checkbox" id="${inputId}" class="peer h-4 w-4 cursor-pointer appearance-none rounded border-slate-500 checked:bg-emerald-500 checked:border-emerald-500 bg-slate-900 transition-colors" ${isDone ? 'checked disabled' : ''}>
                         <svg class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none opacity-0 peer-checked:opacity-100 text-slate-900" viewBox="0 0 14 10" fill="none"><path d="M1 5L4.5 8.5L13 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     </div>
                     <div class="flex-1">
-                        <label for="${inputId}" class="text-sm font-medium ${isDone ? 'text-slate-500 line-through' : 'text-slate-200'} cursor-pointer block">${task.name}</label>
-                        <p class="text-[10px] ${isMonthly ? 'text-emerald-400' : 'text-blue-400'} font-mono mt-0.5">${task.frequency}</p>
+                        <label for="${inputId}" class="text-sm font-bold ${isDone ? 'text-slate-500 line-through' : 'text-slate-200'} cursor-pointer block">${task.name}</label>
+                        <p class="text-[10px] ${isMonthly ? 'text-emerald-500' : 'text-cyan-500'} font-mono mt-1">${task.frequency}</p>
                     </div>
                 `;
-                
                 if (!isDone) {
-                    tEl.querySelector('input').addEventListener('change', async (e) => {
-                        e.target.disabled = true;
-                        if (isMonthly) await setDoc(getLogDocRef('monthly_status'), { ...window.appState.monthlyTaskStatus, [task.name]: Date.now() });
-                        await addDoc(getLogColRef(formatToDash(new Date())), { type: isMonthly ? 'Monthly' : 'Routine', description: `完成: ${task.name}`, taskName: task.name, category: task.category, timestamp: Date.now() });
-                        showToast('任務已完成！');
-                    });
+                    tEl.querySelector('input').addEventListener('change', (e) => { e.target.disabled = true; handleTaskCompletion(task.name, isMonthly, task.category); });
                 }
                 contentEl.appendChild(tEl);
             });
+        });
+        lucide.createIcons();
+    };
+
+    const renderTimeline = () => {
+        const container = document.getElementById('daily-log-timeline');
+        container.innerHTML = '';
+        if (window.appState.dailyLogs.length === 0) {
+            container.innerHTML = `<div class="text-xs text-slate-500 text-center py-8">今日尚無歷程紀錄</div>`; return;
+        }
+        
+        window.appState.dailyLogs.forEach(log => {
+            const isRoutine = log.type === 'Routine' || log.type === 'Monthly';
+            const iconColor = log.type === 'Monthly' ? 'text-emerald-400' : (isRoutine ? 'text-blue-400' : 'text-amber-400');
+            const dotClass = log.type === 'Monthly' ? 'bg-emerald-500' : (isRoutine ? 'bg-blue-500' : 'bg-amber-500');
+            
+            let displayDesc = log.description;
+            if (log.requester) displayDesc = `<span class="text-indigo-400 font-bold mr-1">[${log.requester}]</span>${displayDesc}`;
+
+            const item = document.createElement('div');
+            item.className = 'timeline-item';
+            item.innerHTML = `
+                <div class="timeline-dot ${dotClass}"></div>
+                <div class="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700 shadow-sm flex flex-col gap-2 group">
+                    <div class="flex justify-between items-start">
+                        <p class="text-sm font-bold text-slate-200 flex-1 leading-snug break-words pr-2">${displayDesc}</p>
+                        <button onclick="deleteLog('${log.id}', '${log.taskName || ''}', '${log.type}')" class="text-slate-600 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity p-1 bg-slate-900 rounded" title="刪除紀錄並還原狀態">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+                    <div class="flex justify-between items-center mt-1">
+                        <span class="text-[10px] font-mono text-slate-500 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">[${log.type}] ${log.category}</span>
+                        <span class="text-xs font-mono font-bold ${iconColor}">${log.timeString || '剛剛'}</span>
+                    </div>
+                </div>
+            `;
+            container.appendChild(item);
         });
         lucide.createIcons();
     };
@@ -567,10 +651,10 @@
         const desc = document.getElementById('adhoc-task-description').value.trim();
         if (!desc) return showToast('請輸入事項內容', 'error');
         await addDoc(getLogColRef(formatToDash(new Date())), {
-            type: 'AdHoc', description: desc, category: document.getElementById('adhoc-category').value, requester: document.getElementById('adhoc-requester').value.trim(), timestamp: Date.now()
+            type: 'AdHoc', description: desc, category: document.getElementById('adhoc-category').value, requester: document.getElementById('adhoc-requester').value.trim(),
+            timestamp: Date.now(), timeString: formatTimeStr(new Date())
         });
-        document.getElementById('adhoc-task-description').value = ''; 
-        document.getElementById('adhoc-requester').value = '';
+        document.getElementById('adhoc-task-description').value = ''; document.getElementById('adhoc-requester').value = '';
         showToast('已紀錄臨時事項');
     };
 
@@ -585,11 +669,9 @@
                 const customId = localStorage.getItem('custom_user_id');
                 window.appState.userId = customId || user.uid;
                 document.getElementById('user-id-display').textContent = customId ? `${customId} (Custom)` : user.uid.substring(0,6);
-                setupCalendarListeners();
-                setupDailyLogListeners();
+                setupCalendarListeners(); setupDailyLogListeners();
             }
         });
-
         signInAnonymously(auth).catch(e => showToast('登入失敗', 'error'));
     };
 
